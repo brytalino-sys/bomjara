@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#14161c">
+<title>Бомжара: путь наверх</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#14161c;--card:#1e222b;--card2:#2a303d;--text:#e9ebf2;--muted:#8a92a6;--gold:#f5b942;--good:#4ade80;--bad:#f87171}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{overscroll-behavior:none;-webkit-user-select:none;user-select:none}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+input{font:inherit}
+#app{max-width:520px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;gap:8px;padding:10px 12px calc(76px + env(safe-area-inset-bottom))}
+.top{display:flex;align-items:center;gap:6px}
+.stagechip{flex:1;min-width:0;background:var(--card);padding:7px 10px;border-radius:12px;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{background:var(--card);padding:7px 9px;border-radius:12px;font-size:12px;white-space:nowrap}
+.money{background:var(--card);padding:7px 10px;border-radius:12px;font-weight:700;color:var(--gold);font-size:13px;white-space:nowrap}
+.muted{color:var(--muted);font-size:12px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}
+.stat{background:var(--card);border-radius:12px;padding:5px 9px}
+.stat .row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:3px}
+.stat .row b{color:var(--text)}
+.stat .bar{height:6px;background:#0f1116;border-radius:5px;overflow:hidden}
+.stat .bar i{display:block;height:100%;border-radius:5px;transition:width .3s}
+.stat.low .bar i{animation:pulse .8s infinite alternate}
+.stat.low .row b{color:var(--bad)}
+@keyframes pulse{to{opacity:.35}}
+.goalbox{background:var(--card);border-radius:14px;padding:9px 11px;border:1px solid #2c3342}
+.goalbox .gt{font-size:12px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+.gi{display:flex;align-items:center;gap:6px;font-size:13px;margin:3px 0}
+.gi .pb{flex:1;height:6px;background:#0f1116;border-radius:4px;overflow:hidden;min-width:40px}
+.gi .pb i{display:block;height:100%;background:linear-gradient(90deg,#f5b942,#f59e0b)}
+.gi .v{color:var(--muted);font-size:11px;white-space:nowrap}
+.gi.done{color:var(--good)}
+.log{background:var(--card);border-radius:14px;padding:7px 10px;min-height:76px;max-height:112px;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+.log div{font-size:12.5px;opacity:.55;line-height:1.3}
+.log div:last-child{opacity:1}
+.log .good{color:var(--good)}.log .bad{color:var(--bad)}
+.box{background:var(--card);border-radius:14px;padding:10px 12px;margin-bottom:8px;font-size:13px;line-height:1.4}
+.sec{margin:8px 0 4px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.act{background:var(--card2);border-radius:14px;padding:9px;text-align:left;display:grid;grid-template-columns:28px 1fr;column-gap:7px;align-items:center;min-height:56px}
+.act:active:not(:disabled){transform:scale(.97)}
+.act .ic{font-size:22px;grid-row:span 2}
+.act b{font-size:13px;line-height:1.15}
+.act small{color:var(--muted);font-size:10.5px;line-height:1.2}
+.act:disabled{opacity:.4}
+.act.big{grid-column:1/-1}
+.act.win{background:linear-gradient(90deg,#15803d,#22c55e);color:#04210f}
+.act.win small{color:#064e24}
+.act.red{background:#5b2230}
+.mini{background:var(--card2);border-radius:9px;padding:6px 8px;font-size:12px}
+.mini:disabled{opacity:.4}
+.mini.on{background:var(--gold);color:#241a00;font-weight:700}
+.row2{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:12px;padding:8px 10px;margin-bottom:6px;flex-wrap:wrap}
+.row2 .nm{flex:1;min-width:90px;font-size:13px}
+.row2 .nm small{display:block;color:var(--muted);font-size:11px}
+.row2 .btns{display:flex;gap:5px;flex-wrap:wrap}
+.up{color:var(--good)}.dn{color:var(--bad)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+nav{position:fixed;left:0;right:0;bottom:0;background:#0f1116;border-top:1px solid #222735;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav #nav{max-width:520px;margin:0 auto;display:flex;overflow-x:auto;scrollbar-width:none}
+nav #nav::-webkit-scrollbar{display:none}
+nav button{background:none;flex:1 0 64px;padding:8px 2px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;opacity:.55}
+nav button span{font-size:21px}
+nav button small{font-size:10px;white-space:nowrap}
+nav button.on{opacity:1;color:var(--gold)}
+#over,#modal{position:fixed;inset:0;background:rgba(5,6,9,.84);display:none;align-items:center;justify-content:center;padding:14px;z-index:20}
+#over.show,#modal.show{display:flex}
+.sheet{background:var(--card);border-radius:20px;padding:16px;width:100%;max-width:440px;max-height:90dvh;overflow-y:auto}
+.sheet h2{margin:0 0 8px;font-size:19px}
+.sheet p{margin:6px 0;line-height:1.4;font-size:14px;color:#c9cedb}
+.sheet ul{margin:6px 0;padding-left:18px;font-size:13.5px;line-height:1.5;color:#c9cedb}
+.btn{display:block;width:100%;padding:13px;border-radius:14px;background:var(--gold);color:#241a00;font-weight:800;font-size:15px;margin-top:10px}
+.btn.alt{background:var(--card2);color:var(--text)}
+.item{display:flex;align-items:center;gap:10px;background:var(--card2);border-radius:12px;padding:8px 10px;margin-top:6px}
+.item .ic{font-size:22px}.item .tx{flex:1;font-size:13px}.item .tx small{display:block;color:var(--muted);font-size:11px}
+.item button{background:var(--gold);color:#241a00;font-weight:700;border-radius:10px;padding:8px 10px;font-size:12.5px;white-space:nowrap}
+.item button:disabled{background:#3a4152;color:#8a92a6}
+.reign{background:var(--card);border-radius:18px;padding:14px;text-align:center;margin-bottom:8px}
+.reign .who{font-size:44px}
+.reign .tx{font-size:15px;line-height:1.35;margin:8px 0 4px}
+.cas{background:#12261d;border:1px solid #1f4d36;border-radius:14px;padding:10px;margin-bottom:8px;text-align:center}
+.cas .res{font-size:26px;margin:6px 0;min-height:34px}
+.cas .sub{font-size:12px;color:#9fd8b8;min-height:16px}
+input[type=number]{width:64px;background:var(--card2);border:0;color:var(--text);border-radius:8px;padding:6px 8px}
+#toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:#000c;padding:8px 14px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30;max-width:88vw;text-align:center}
+#toast.show{opacity:1}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="stagechip" id="stage"></div>
+    <div class="chip" id="clock"></div>
+    <button class="money" id="wallet"></button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div id="goal"></div>
+  <div class="log" id="log"></div>
+  <div id="view"></div>
+</div>
+<nav><div id="nav"></div></nav>
+<div id="over"></div>
+<div id="modal"><div class="sheet" id="modalBody"></div></div>
+<div id="toast"></div>
+<script>
+/* --- 01_core.js --- */
+/* ===================== CORE ===================== */
+const tg = window.Telegram && window.Telegram.WebApp;
+const T = f => { try { f(); } catch (e) {} };
+if (tg) {
+  T(() => tg.ready()); T(() => tg.expand());
+  T(() => tg.setHeaderColor('#14161c')); T(() => tg.setBackgroundColor('#14161c'));
+  T(() => tg.disableVerticalSwipes());
+}
+const hap = (t = 'light') => T(() => tg.HapticFeedback.impactOccurred(t));
+const note = t => T(() => tg.HapticFeedback.notificationOccurred(t));
+
+// Адрес воркера рейтинга (см. server/README.md). Пусто = рейтинг только локальный.
+const API_URL = '';
+// Ссылка на мини-апп для кнопки "Поделиться" (например https://t.me/your_bot/app)
+const SHARE_URL = '';
+const KEY = 'bomzhara_v2', META_KEY = 'bomzhara_meta_v2';
+
+const $ = s => document.querySelector(s);
+const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+const rf = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
+const pad = n => String(n).padStart(2, '0');
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+const SYM = { RUB: '₽', USD: '$', EUR: '€', CNY: '¥' };
+function fmt(n) {
+  const a = Math.abs(n), s = n < 0 ? '-' : '';
+  const t = (x, d) => String(+x.toFixed(d)).replace('.', ',');
+  if (a < 1e5) return s + Math.round(a).toLocaleString('ru-RU').replace(/[  ]/g, ' ');
+  if (a < 1e6) return s + t(a / 1e3, 0) + ' тыс';
+  if (a < 1e9) return s + t(a / 1e6, a < 1e7 ? 2 : 1) + ' млн';
+  if (a < 1e12) return s + t(a / 1e9, 2) + ' млрд';
+  return s + t(a / 1e12, 2) + ' трлн';
+}
+const mny = (n, c = 'RUB') => fmt(n) + ' ' + SYM[c];
+
+/* ---------- глобальные реестры ---------- */
+let S, CUR = [];
+const M = { fn: null };       // модальное окно: функция, возвращающая HTML
+const DAILY = [];             // ежедневные хуки
+const TABS = {};              // вкладки
+const GOALS = {};             // цели этапов
+const TAB_ORDER = ['yard', 'market', 'station', 'scrap', 'shelter', 'home', 'work', 'study', 'biz', 'invest', 'empire', 'politics', 'state', 'bank', 'casino', 'garage', 'rating'];
+
+/* ---------- состояние ---------- */
+function fresh() {
+  const stk = {}; STOCKS.forEach(s => stk[s.id] = { p: s.p, q: 0, h: [s.p] });
+  return {
+    v: 2, stage: 1, day: 1, hour: 8, intro: false, over: null,
+    cash: { RUB: 40, USD: 0, EUR: 0, CNY: 0 }, debt: 0, deposit: 0,
+    hp: 100, food: 70, energy: 85, warm: 85, mood: 70,
+    loc: 'yard', tab: 'yard',
+    bottles: 0, metal: 0, jacket: false, bag: false, cart: false, shelterFull: 0, soupDay: 0, pass: 0, passDay: 0,
+    housing: 0, arrears: 0, transport: 0,
+    edu: { school: 0, uni: 0, exams: 0, visa: 0, visaDay: 0 }, major: null, mba: false,
+    job: false, jobLvl: 0, jobXp: 0,
+    team: 0, perf: 50, lowPerf: 0,
+    biz: { units: [], brand: 0, sup: 1, mgr: false, neglect: 0, crisis: 0, month: 0 },
+    stk, estate: { n: 0, price: 25e6 }, corps: [], scandal: 0, rep: 50,
+    pol: { lvl: 0, appr: 50, next: 0, camp: 0 },
+    st: { treasure: 50, people: 50, army: 50, science: 50, space: 0, card: null },
+    fx: { r: { USD: 95, EUR: 103, CNY: 13.2 }, b: { USD: 95, EUR: 103, CNY: 13.2 }, h: { USD: [95], EUR: [103], CNY: [13.2] }, d: { USD: 0, EUR: 0, CNY: 0 } },
+    azart: 0, chip: 0, game: 'slots', cas: { last: '', sub: '', bj: null, num: 17 },
+    did: {}, stats: { casinoNet: 0, hosp: 0, falls: 0 }, stageDay: { 1: 1 },
+    log: []
+  };
+}
+function save() {
+  const j = JSON.stringify(S);
+  T(() => localStorage.setItem(KEY, j));
+  T(() => tg.CloudStorage.setItem(KEY, j.length < 4000 ? j : '{}'));
+}
+function loadSave(cb) {
+  let j = null;
+  T(() => { j = localStorage.getItem(KEY); });
+  if (j) { try { cb(JSON.parse(j)); return; } catch (e) {} }
+  cb(null);
+}
+let META = { best: null, runs: 0, wins: 0 };
+function loadMeta() { T(() => { const j = localStorage.getItem(META_KEY); if (j) META = Object.assign(META, JSON.parse(j)); }); }
+function saveMeta() { T(() => localStorage.setItem(META_KEY, JSON.stringify(META))); }
+
+/* ---------- деньги ---------- */
+const rub = () => S.cash.RUB;
+const earn = (n, c = 'RUB') => { S.cash[c] += n; };
+function pay(n, c = 'RUB') { if (S.cash[c] + 1e-9 < n) return false; S.cash[c] -= n; return true; }
+const toRub = (n, c) => c === 'RUB' ? n : n * S.fx.r[c];
+function assetsRub() {
+  let n = S.cash.RUB;
+  for (const c of ['USD', 'EUR', 'CNY']) n += S.cash[c] * S.fx.r[c];
+  n += S.deposit;
+  for (const k in S.stk) n += S.stk[k].p * S.stk[k].q;
+  n += S.estate.n * S.estate.price;
+  const H = HOUSING[S.housing]; if (H.own) n += H.price;
+  const t = TRANS[S.transport]; if (t.price) n += toRub(t.price, t.cur || 'RUB') * 0.5;
+  for (const l of S.biz.units) n += BIZ[l].cost * 0.8;
+  for (const id of S.corps) n += CORPS.find(c => c.id === id).price * 0.9;
+  return n;
+}
+const netWorth = () => assetsRub() - S.debt;
+function calcScore() { return Math.max(0, Math.round(S.stage * 10000 + 1500 * Math.log10(1 + Math.max(0, netWorth())) - S.day)); }
+
+/* ---------- мелочи ---------- */
+function say(t, cls = '') { S.log.push({ t, cls }); if (S.log.length > 30) S.log.shift(); }
+function toast(m) { const el = $('#toast'); el.textContent = m; el.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 1700); }
+const eat = n => { S.food = clamp(S.food + n); };
+const hurt = n => { S.hp = clamp(S.hp - n); };
+const heal = n => { S.hp = clamp(S.hp + n); };
+const moodUp = n => { S.mood = clamp(S.mood + n); };
+const enUp = n => { S.energy = clamp(S.energy + n); };
+const inH = (a, b) => S.hour >= a && S.hour < b;
+const isNightH = h => h >= 21 || h < 6;
+const isNight = () => isNightH(S.hour);
+function temp(day, hour) {
+  const base = 9 - day * 0.8 + Math.sin(day * 1.7) * 3;
+  const dip = hour < 5 ? 2 : 0;
+  return Math.round(base - (isNightH(hour) ? 4 : 0) - dip + (hour >= 12 && hour <= 16 ? 2 : 0));
+}
+
+/* ---------- кнопки-замыкания ---------- */
+function B(ic, t, s, run, ok = true, why = '', cls = '') {
+  const i = CUR.push(run) - 1;
+  return '<button class="act ' + cls + '" data-i="' + i + '"' + (ok ? '' : ' disabled') + '><span class="ic">' + ic + '</span><b>' + t + '</b><small>' + (ok ? (s || '') : (why || '')) + '</small></button>';
+}
+function mini(t, run, ok = true, cls = '') {
+  const i = CUR.push(run) - 1;
+  return '<button class="mini ' + cls + '" data-i="' + i + '"' + (ok ? '' : ' disabled') + '>' + t + '</button>';
+}
+const grid = a => '<div class="acts">' + a.join('') + '</div>';
+const sec = t => '<div class="sec">' + t + '</div>';
+const box = h => '<div class="box">' + h + '</div>';
+function sheet(h) { return '<h2>' + h.t + '</h2>' + (h.html || '') + mini('Закрыть', () => { M.fn = null; }, true, 'closebtn'); }
+function closeBtn() { return '<div style="margin-top:10px">' + mini('Закрыть', () => { M.fn = null; }) + '</div>'; }
+
+/* ---------- время и характеристики ---------- */
+const HSTEP = 0.5;
+function stepStats(mode) {
+  const k = HSTEP;
+  if (S.stage >= 10) return;
+  const sleeping = mode === 'sleepOut' || mode === 'sleepIn' || mode === 'sleepHome';
+  const housed = S.housing > 0;
+  const indoor = housed || mode === 'in' || mode === 'sleepIn';
+  const q = housed ? HOUSING[S.housing].q : 1;
+  S.food = clamp(S.food - (sleeping ? 1.5 : 2.5) * k);
+  S.energy = clamp(S.energy + (sleeping ? (indoor ? 11 * q : 8) : -3) * k);
+  if (S.stage >= 2) S.mood = clamp(S.mood + (sleeping ? 1.5 * q : -0.7) * k);
+  if (housed) S.warm = 100;
+  else {
+    const t = temp(S.day, S.hour);
+    const cf = clamp((10 - t) / 10, 0, 2.6);
+    let loss = 1.7 * cf;
+    if (S.jacket) loss *= 0.65;
+    if (sleeping && S.bag) loss *= 0.5;
+    if (indoor) S.warm = clamp(S.warm + (sleeping ? 3 : 8) * k);
+    else S.warm = clamp(S.warm - loss * k);
+  }
+  if (S.food <= 0) S.hp -= 4 * k;
+  if (S.warm <= 0) S.hp -= 5 * k;
+  if (S.energy <= 0) S.hp -= 2 * k;
+  if (S.stage >= 2 && S.mood <= 0) S.hp -= 1.5 * k;
+  const ok = S.food > 40 && S.warm > 40 && S.energy > 25 && (S.stage < 2 || S.mood > 25);
+  if (ok) S.hp += (sleeping ? 2 : 0.7) * k;
+  S.hp = clamp(S.hp);
+}
+function tick(h, mode = 'out') {
+  const steps = Math.max(1, Math.round(h / HSTEP));
+  for (let i = 0; i < steps; i++) {
+    S.hour += HSTEP;
+    if (S.hour >= 24) { S.hour -= 24; newDay(); }
+    stepStats(mode);
+    if (S.hp <= 0) { if (!collapse()) return false; }
+  }
+  return true;
+}
+function newDay() {
+  S.day++; S.did = {};
+  for (const f of DAILY) { try { f(); } catch (e) { console.error(e); } }
+}
+function collapse() {
+  if (S.stage === 1) { die(); return false; }
+  const fee = Math.round(S.cash.RUB * 0.1); S.cash.RUB -= fee;
+  S.hp = 60; S.food = 60; S.energy = 60; S.mood = Math.max(S.mood, 40);
+  S.stats.hosp++;
+  say('🏥 Организм сдался. Неделя в больнице, счёт: ' + mny(fee) + '.', 'bad');
+  for (let i = 0; i < 7; i++) newDay();
+  return true;
+}
+function die() {
+  if (S.over) return;
+  S.hp = 0;
+  const why = S.food <= 0 ? 'умер от голода' : S.warm <= 0 ? 'замёрз насмерть' : S.energy <= 0 ? 'упал без сил и не встал' : 'не пережил уличные разборки';
+  S.over = { type: 'dead', why };
+  note('error'); finishRun();
+}
+function finishRun() {
+  META.runs++;
+  const sc = calcScore();
+  if (!META.best || sc > META.best.score) META.best = { score: sc, stage: S.stage, day: S.day };
+  if (S.over && S.over.type === 'win') META.wins++;
+  saveMeta(); submitScore(true);
+}
+
+/* ---------- пауза и пропуск дней ---------- */
+function autoEat() {
+  const opts = FOODS.filter(f => f.min <= S.stage).reverse();
+  const cap = Math.max(120, rub() * 0.01);
+  let f = opts.find(x => x.p <= cap && x.p <= rub());
+  if (!f) f = FOODS.find(x => x.p <= rub());
+  if (f) { S.cash.RUB -= f.p; eat(f.f); moodUp(f.m || 0); heal(f.h || 0); }
+}
+function waitDays(n) {
+  for (let i = 0; i < n; i++) {
+    if (S.over || S.stage === 1) break;
+    autoEat(); if (!tick(8, 'sleepHome')) break;
+    autoEat(); if (!tick(8, 'home')) break;
+    autoEat(); if (!tick(8, 'home')) break;
+  }
+}
+
+/* ---------- смена этапов ---------- */
+function tabsNow() { return TAB_ORDER.filter(id => TABS[id] && S.stage >= TABS[id].from && S.stage <= TABS[id].to); }
+function setStage(n, kind, reason) {
+  const up = n > S.stage;
+  S.stage = n;
+  if (!S.stageDay[n]) S.stageDay[n] = S.day;
+  const START = { 2: 'work', 3: 'study', 4: 'work', 5: 'work', 6: 'biz', 7: 'invest', 8: 'empire', 9: 'politics', 10: 'state' };
+  S.tab = (up && START[n] && tabsNow().includes(START[n])) ? START[n] : tabsNow()[0];
+  S.did = {};
+  if (up) { M.fn = () => stageModal(n); note('success'); }
+  else { S.stats.falls++; M.fn = () => fallModal(n, reason); note('error'); }
+  save(); submitScore();
+}
+function stageModal(n) {
+  const st = STAGES[n];
+  return '<h2>' + st.ic + ' ' + st.n + '</h2><p>' + st.tag + '</p><ul>' + st.feat.map(f => '<li>' + f + '</li>').join('') + '</ul>' + '<button class="btn" id="mclose" data-close="1">Поехали</button>';
+}
+function fallModal(n, reason) {
+  const st = STAGES[n];
+  return '<h2>📉 Откат: ' + st.ic + ' ' + st.n + '</h2><p>' + reason + '</p><p>Падение не конец. Поднимайся снова.</p><button class="btn" data-close="1">Понял</button>';
+}
+function fall(n, reason) { say('📉 ' + reason, 'bad'); setStage(n, 'down', reason); }
+
+/* --- 02_data.js --- */
+/* ===================== ДАННЫЕ ===================== */
+const STAGES = {
+  1: { ic: '🧥', n: 'Без адреса', tag: 'Улица, холод и бутылки. Нужно восстановить паспорт и снять комнату.', feat: ['Тепло падает на улице', 'Бутылки, лом, подаяние, приют', 'Цель: паспорт и комната'] },
+  2: { ic: '🧹', n: 'Трудяга', tag: 'Своя комната и честная работа.', feat: ['Смены: дворник, курьер, грузчик, сторож', 'Вечерняя школа ради аттестата', 'Подпольные автоматы: осторожно с азартом'] },
+  3: { ic: '🎓', n: 'Студент', tag: 'Учёба открывает дорогу наверх.', feat: ['Лекции и сессии', 'Выбор специальности', 'Стипендия, подработки, фриланс'] },
+  4: { ic: '💼', n: 'Специалист', tag: 'Первая настоящая профессия.', feat: ['Карьерная лестница: младший, специалист, ведущий', 'Банк и обменник валют', 'Иностранный вуз (MBA) за евро'] },
+  5: { ic: '📊', n: 'Руководитель', tag: 'Теперь ты отвечаешь за команду.', feat: ['Команда и KPI', 'Сокращение, если результаты упадут', 'Бизнес-седан'] },
+  6: { ic: '🏪', n: 'Предприниматель', tag: 'Своё дело: от ларька до холдинга.', feat: ['Точки, поставщики, реклама', 'Налоги и кризисы', 'Можно разориться и откатиться'] },
+  7: { ic: '📈', n: 'Инвестор', tag: 'Деньги работают сами.', feat: ['Биржа акций с новостями', 'Недвижимость', 'Вертолёт, дом за городом'] },
+  8: { ic: '🏛️', n: 'Магнат', tag: 'Корпорации и влияние.', feat: ['Покупка корпораций', 'Репутация и скандалы', 'Частный самолёт'] },
+  9: { ic: '🗳️', n: 'Политик', tag: 'Власть через выборы. Страна вымышленная: Республика Аркадия.', feat: ['Кампании, митинги, дебаты', 'Рейтинг одобрения', 'Депутат, регион, пост президента'] },
+  10: { ic: '👑', n: 'Президент', tag: 'Каждый день новое решение. Цель: космическая программа.', feat: ['Решения-карточки', 'Казна, народ, армия, наука', 'Построй ракету и улетай'] }
+};
+
+const HOUSING = [
+  { n: 'Улица', up: 0, q: 0.8, ic: '🧥' },
+  { n: 'Комната в общаге', up: 300, q: 1, ic: '🛏️', min: 2 },
+  { n: 'Студенческая общага', up: 100, q: 1, ic: '🏫', only: 3 },
+  { n: 'Съёмная квартира', up: 1800, q: 1.1, ic: '🏢', fee: 5400, min: 4 },
+  { n: 'Своя квартира', up: 400, q: 1.15, ic: '🏠', own: true, price: 4e6, min: 4 },
+  { n: 'Дом за городом', up: 3000, q: 1.25, ic: '🏡', own: true, price: 40e6, min: 6 },
+  { n: 'Особняк', up: 20000, q: 1.35, ic: '🏰', own: true, price: 400e6, min: 8 },
+  { n: 'Президентская резиденция', up: 0, q: 1.4, ic: '🏛️', only: 10 }
+];
+
+// c = время на дорогу к работе/учёбе, часов
+const TRANS = [
+  { n: 'Кроссовки', ic: '👟', c: 2, price: 0, up: 0 },
+  { n: 'Велосипед', ic: '🚲', c: 1.5, price: 12000, min: 2, up: 0 },
+  { n: 'Электросамокат', ic: '🛴', c: 1, price: 45000, min: 2, up: 20 },
+  { n: 'Подержанная машина', ic: '🚗', c: 1, price: 700000, min: 4, up: 300 },
+  { n: 'Бизнес-седан', ic: '🚘', c: 0.5, price: 5e6, min: 5, up: 1500 },
+  { n: 'Спорткар', ic: '🏎️', c: 0.5, price: 350000, cur: 'EUR', min: 6, up: 5000 },
+  { n: 'Вертолёт', ic: '🚁', c: 0, price: 4e6, cur: 'USD', min: 7, up: 30000 },
+  { n: 'Частный самолёт', ic: '🛩️', c: 0, price: 45e6, cur: 'USD', min: 8, up: 200000 },
+  { n: 'Ракета', ic: '🚀', c: 0, price: 0, up: 0, min: 99 }
+];
+
+const FOODS = [
+  { id: 0, n: 'Готовка дома', ic: '🍳', p: 60, f: 30, m: -1, min: 2 },
+  { id: 1, n: 'Столовая', ic: '🍲', p: 150, f: 42, m: 1, min: 2 },
+  { id: 2, n: 'Кафе', ic: '☕', p: 450, f: 50, m: 4, min: 3 },
+  { id: 3, n: 'Доставка', ic: '🛵', p: 1000, f: 52, m: 6, h: 1, min: 4 },
+  { id: 4, n: 'Ресторан', ic: '🍷', p: 3000, f: 58, m: 10, h: 2, min: 5 },
+  { id: 5, n: 'Личный повар', ic: '👨‍🍳', p: 20000, f: 70, m: 16, h: 4, e: 5, min: 7 }
+];
+
+const LEISURE = [
+  { n: 'Прогулка', ic: '🚶', h: 2, cost: 0, mood: 10, en: -2, min: 2 },
+  { n: 'Кино', ic: '🎬', h: 3, cost: 700, mood: 20, min: 2 },
+  { n: 'Клуб', ic: '🕺', h: 4, cost: 4000, mood: 30, hp: -3, en: -8, min: 3 },
+  { n: 'Спа и массаж', ic: '💆', h: 3, cost: 25000, mood: 25, hp: 6, en: 10, min: 5 },
+  { n: 'Отпуск на 5 дней', ic: '🏝️', days: 5, cost: 400000, mood: 80, hp: 25, min: 5 }
+];
+
+const JOBS2 = [
+  { id: 'yard', n: 'Дворник', ic: '🧹', h: 6, pay: 1100, en: 8, mo: 6 },
+  { id: 'courier', n: 'Курьер', ic: '🛵', h: 5, pay: 800, en: 8, mo: 5, tips: 1 },
+  { id: 'loader', n: 'Грузчик', ic: '📦', h: 4, pay: 700, en: 12, mo: 4 },
+  { id: 'guard', n: 'Ночной сторож', ic: '🔦', h: 8, pay: 1500, en: 10, mo: 10, night: 1 }
+];
+const JOBS3 = [
+  { id: 'barista', n: 'Бариста', ic: '☕', h: 4, pay: 900, en: 6, mo: 4 },
+  { id: 'courier', n: 'Курьер', ic: '🛵', h: 5, pay: 800, en: 8, mo: 5, tips: 1 },
+  { id: 'free', n: 'Фриланс', ic: '💻', h: 3, pay: 0, en: 6, mo: 4, free: 1 }
+];
+const MAJORS = [
+  { id: 'it', n: 'Информатика', ic: '💻', mult: 1.3, mo: 12, titles: ['Джуниор-разработчик', 'Разработчик', 'Ведущий разработчик'] },
+  { id: 'eco', n: 'Экономика', ic: '📊', mult: 1.15, mo: 10, titles: ['Помощник аналитика', 'Аналитик', 'Ведущий аналитик'] },
+  { id: 'tech', n: 'Технологии', ic: '🧪', mult: 1.0, mo: 8, titles: ['Лаборант-технолог', 'Технолог', 'Главный технолог'] }
+];
+const CAREER_PAY = [10000, 20000, 35000];
+const CAREER_XP = [0, 15, 40];
+const SCHOOL_PTS = 30, UNI_PTS = 60, EXAM_STEP = 15;
+
+const STOCKS = [
+  { id: 'EGZ', n: 'ЭнергоГаз', vol: 0.012, drift: 0.0004, p: 240 },
+  { id: 'TSF', n: 'ТехноСфера', vol: 0.03, drift: 0.0008, p: 1200 },
+  { id: 'AGM', n: 'АгроМир', vol: 0.018, drift: 0.0005, p: 85 },
+  { id: 'BNK', n: 'БанкОптима', vol: 0.02, drift: 0.0005, p: 310 },
+  { id: 'KSM', n: 'КосмоНаука', vol: 0.045, drift: 0.001, p: 30 }
+];
+
+const BIZ = [
+  { n: 'Ларёк', ic: '🏪', cost: 3e6 },
+  { n: 'Кафе', ic: '☕', cost: 12e6 },
+  { n: 'Сеть кафе', ic: '🍽️', cost: 48e6 },
+  { n: 'Холдинг', ic: '🏭', cost: 200e6 }
+];
+const SUPS = [
+  { n: 'Дешёвый поставщик', d: 'маржа выше, риск порчи', m: 1.15 },
+  { n: 'Надёжный поставщик', d: 'без сюрпризов', m: 1.0 },
+  { n: 'Премиум-поставщик', d: 'маржа ниже, бренд растёт', m: 0.9 }
+];
+
+const CORPS = [
+  { id: 'media', n: 'Медиахолдинг', ic: '📺', price: 150e6, y: 0.018, rep: 0.1, note: 'любимец публики' },
+  { id: 'ener', n: 'Энергокомпания', ic: '⚡', price: 250e6, y: 0.02, rep: 0, note: 'стабильный поток' },
+  { id: 'tob', n: 'Табачная фабрика', ic: '🚬', price: 120e6, y: 0.03, rep: -0.3, note: 'доходно, но репутация страдает' },
+  { id: 'pharma', n: 'Фармкомпания', ic: '💊', price: 200e6, y: 0.019, rep: 0.1, note: 'спасает жизни и кошелёк' },
+  { id: 'arms', n: 'Оборонный завод', ic: '🛡️', price: 400e6, y: 0.028, rep: -0.25, note: 'высокий доход, плохая слава' },
+  { id: 'space', n: 'Космическое агентство', ic: '🛰️', price: 600e6, y: 0.015, rep: 0.2, note: 'даст фору в космической программе' }
+];
+
+// Карточки главы государства. fx: изменения шкал; sp: прогресс космоса
+const CARDS = [
+  { who: '🧑‍💼', t: 'Министр финансов предлагает поднять налоги.', L: ['Поднять', { treasure: 12, people: -10 }], R: ['Отказать', { treasure: -6, people: 5 }] },
+  { who: '🎖️', t: 'Генерал просит деньги на новые танки.', L: ['Одобрить', { army: 12, treasure: -10 }], R: ['Отказать', { army: -8, treasure: 3 }] },
+  { who: '🔬', t: 'Учёные просят грант на ракетные двигатели.', L: ['Дать', { science: 10, treasure: -8 }, 6], R: ['Отказать', { science: -8, treasure: 3 }] },
+  { who: '⛏️', t: 'Шахтёры объявили забастовку.', L: ['Уступить', { people: 8, treasure: -8 }], R: ['Разогнать', { people: -12, army: 4 }] },
+  { who: '💸', t: 'Инфляция растёт, цены кусаются.', L: ['Печатать деньги', { treasure: 10, people: -8 }], R: ['Затянуть пояса', { treasure: 5, people: -6, science: -2 }] },
+  { who: '🤝', t: 'Посол соседней страны предлагает союз.', L: ['Подписать', { army: 8, science: 4, people: -4 }], R: ['Отказать', { army: -4, people: 3 }] },
+  { who: '🎪', t: 'Предлагают провести национальный фестиваль.', L: ['Провести', { people: 10, treasure: -6 }], R: ['Отменить', { people: -5, treasure: 3 }] },
+  { who: '🛰️', t: 'Космодром просит модернизацию.', L: ['Модернизировать', { treasure: -10, science: 3 }, 8], R: ['Отложить', { science: -2 }, -2] },
+  { who: '🕵️', t: 'Разведка докладывает о шпионах.', L: ['Усилить контрразведку', { army: 6, treasure: -5 }], R: ['Игнорировать', { army: -6, science: -3 }] },
+  { who: '🎓', t: 'Университеты требуют реформу образования.', L: ['Одобрить', { science: 10, treasure: -6 }, 2], R: ['Отказать', { science: -6, people: 3 }] },
+  { who: '🛢️', t: 'Нефть подорожала.', L: ['Продать запасы', { treasure: 14, army: -3 }], R: ['Сохранить', { army: 3, treasure: -2 }] },
+  { who: '🦠', t: 'Вспышка эпидемии.', L: ['Карантин', { people: -5, treasure: -6 }], R: ['Не вмешиваться', { people: -14 }] },
+  { who: '🏭', t: 'Частные компании просят право запускать спутники.', L: ['Разрешить', { treasure: 6, science: 4, people: 2 }, 5], R: ['Запретить', { treasure: -4, science: -3 }] },
+  { who: '📢', t: 'Оппозиция вышла на митинг.', L: ['Выслушать', { people: 6, army: -4 }], R: ['Разогнать', { people: -10, army: 6 }] },
+  { who: '🌾', t: 'Неурожай в южных районах.', L: ['Закупить зерно', { treasure: -10, people: 8 }], R: ['Подождать', { people: -12 }] },
+  { who: '🧪', t: 'Лаборатория нашла новый сплав для ракет.', L: ['Финансировать', { treasure: -6, science: 8 }, 7], R: ['Продать патент', { treasure: 10, science: -4 }] },
+  { who: '🪖', t: 'Армия недовольна зарплатами.', L: ['Повысить', { army: 10, treasure: -9 }], R: ['Отказать', { army: -12 }] },
+  { who: '🌍', t: 'ООН просит помощи для соседей.', L: ['Помочь', { people: 4, treasure: -8, science: 2 }], R: ['Отказать', { people: -2, treasure: 2 }] },
+  { who: '💻', t: 'Хакеры атаковали министерства.', L: ['Нанять специалистов', { treasure: -6, science: 6, army: 3 }], R: ['Переждать', { science: -6, people: -4 }] },
+  { who: '🏟️', t: 'Предлагают построить олимпийский стадион.', L: ['Строить', { people: 10, treasure: -12 }], R: ['Отказать', { people: -6, treasure: 4 }] },
+  { who: '🚀', t: 'Инженеры просят увеличить бюджет космической программы.', L: ['Увеличить', { treasure: -12, science: 4 }, 10], R: ['Оставить как есть', { science: -2 }] },
+  { who: '🏛️', t: 'Парламент требует отчёта о тратах.', L: ['Отчитаться', { people: 6, treasure: -3 }], R: ['Распустить', { people: -9, army: 5, treasure: 3 }] }
+];
+
+/* --- 03_street.js --- */
+/* ===================== ЭТАП 1: УЛИЦА ===================== */
+const STREET = ['yard', 'market', 'station', 'scrap', 'shelter'];
+const LOCS = {
+  yard: { ic: '🏚️', n: 'Двор', d: 'Гаражи, помойка, скамейка.' },
+  market: { ic: '🛒', n: 'Рынок', d: 'Шумно и людно. Работает 8-20.' },
+  station: { ic: '🚉', n: 'Вокзал', d: 'Тепло и людно. Патруль тоже.' },
+  scrap: { ic: '♻️', n: 'Промзона', d: 'Пункт приёма 9-18. Стекло и металл.' },
+  shelter: { ic: '⛪', n: 'Приют', d: 'Суп 12-15, ночлег 19-23, соцработник 9-17.' }
+};
+const BOTTLE = 6, METAL = 30;
+const FOOD1 = [
+  { id: 'bread', ic: '🍞', n: 'Хлеб', p: 25, f: 14 },
+  { id: 'noodles', ic: '🍜', n: 'Бич-пакет', p: 45, f: 26 },
+  { id: 'shaw', ic: '🌯', n: 'Шаурма', p: 130, f: 50, w: 8 },
+  { id: 'tea', ic: '☕', n: 'Горячий чай', p: 20, f: 3, w: 12 }
+];
+const GEAR = [
+  { id: 'jacket', ic: '🧥', n: 'Тёплая куртка', p: 300, d: 'Холод бьёт на 35% слабее' },
+  { id: 'bag', ic: '🛏️', n: 'Спальник', p: 450, d: 'Ночью на улице теряешь вдвое меньше тепла' },
+  { id: 'cart', ic: '🛒', n: 'Тележка', p: 250, d: 'Влезает втрое больше тары' }
+];
+const cap = () => S.cart ? 45 : 15;
+const load = () => S.bottles + S.metal * 3;
+const freeLoad = () => cap() - load();
+
+function findBottles(lo, hi) {
+  const n = rand(lo, hi), got = Math.min(n, Math.max(0, freeLoad()));
+  S.bottles += got;
+  say(got ? 'Нашёл бутылок: ' + got + (got < n ? ' (остальные не влезли).' : '.') : 'Бутылки есть, а класть некуда.', got ? 'good' : '');
+}
+function police() {
+  if (S.cash.RUB >= 30 && Math.random() < 0.6) {
+    const fine = Math.min(S.cash.RUB, rand(30, 90)); S.cash.RUB -= fine;
+    say('Патруль: «Документы!» Откупился на ' + fine + ' ₽.', 'bad');
+  } else { enUp(-12); say('Патруль погнал взашей. Еле убежал.', 'bad'); }
+  note('warning');
+}
+const EV1 = [
+  { w: 3, loc: '*', run: () => { const n = rand(10, 60); earn(n); say('Нашёл в траве мятую купюру: ' + n + ' ₽.', 'good'); } },
+  { w: 3, loc: ['yard', 'market', 'station'], run: () => { eat(22); say('Бабуля сунула пирожок. «Ешь, милок».', 'good'); } },
+  { w: 2, loc: '*', run: () => { earn(50); say('Прохожий молча положил тебе 50 ₽.', 'good'); } },
+  { w: 2, loc: ['yard', 'scrap'], run: () => { enUp(-12); hurt(3); say('Стая собак устроила погоню. Убежал, но запыхался.', 'bad'); note('warning'); } },
+  { w: 2, loc: ['yard', 'station', 'market'], run: () => { hurt(14); say('Пьяная компания докопалась. Получил по рёбрам.', 'bad'); note('error'); } },
+  { w: 2, loc: ['station', 'market'], run: police },
+  { w: 2, loc: ['yard', 'scrap'], cond: () => S.bottles >= 4, run: () => { const l = Math.ceil(S.bottles * 0.4); S.bottles -= l; say('Конкуренты увели у тебя бутылок: ' + l + '.', 'bad'); } },
+  { w: 3, loc: '*', cond: () => isNight(), run: () => { S.warm = clamp(S.warm - 8); say('К ночи мороз крепчает. Пробирает до костей.', 'bad'); } },
+  { w: 2, loc: '*', run: () => { S.warm = clamp(S.warm + 12); eat(5); say('Дядя Миша угостил горячим чаем из термоса.', 'good'); } },
+  { w: 1, loc: ['market'], run: () => { eat(28); say('Продавщица отдала вчерашние булки.', 'good'); } },
+  { w: 2, loc: '*', cond: () => temp(S.day, S.hour) < 0, run: () => { hurt(6); say('Поскользнулся на льду, ушиб бок.', 'bad'); } },
+  { w: 1, loc: ['shelter'], run: () => { S.warm = clamp(S.warm + 10); say('Волонтёры раздали тёплые носки.', 'good'); } },
+  { w: 1, loc: ['scrap', 'yard'], cond: () => freeLoad() > 2, run: () => findBottles(2, 5) }
+];
+function maybeEvent(p) {
+  if (S.hp <= 0 || Math.random() >= p) return;
+  const pool = EV1.filter(e => (e.loc === '*' || e.loc.includes(S.loc)) && (!e.cond || e.cond()));
+  const sum = pool.reduce((a, e) => a + e.w, 0);
+  let r = Math.random() * sum;
+  for (const e of pool) { r -= e.w; if (r <= 0) { e.run(); return; } }
+}
+function beg(lo, hi, pp) {
+  if (!tick(1, 'out')) return;
+  const n = rand(lo, hi);
+  if (n > 0) { earn(n); say('Подали ' + n + ' ₽.', 'good'); } else say('Все спешат мимо. Ни копейки.');
+  if (Math.random() < pp) police(); else maybeEvent(0.2);
+}
+function dumpster() {
+  if (!tick(1, 'out')) return;
+  const r = Math.random();
+  if (r < 0.4) {
+    const f = rand(8, 18); eat(f);
+    if (Math.random() < 0.25) { hurt(8); say('Объедки (+' + f + ' сытости) были с душком. Живот болит.', 'bad'); }
+    else say('Нашёл вполне съедобные объедки (+' + f + ' сытости).', 'good');
+  } else if (r < 0.65) { const m = rand(3, 25); earn(m); say('В мусорке нашлась мелочь: ' + m + ' ₽.', 'good'); }
+  else if (r < 0.8) findBottles(1, 3);
+  else say('Пусто. Только запах.');
+  maybeEvent(0.15);
+}
+function sleepStreet(mode, theftP, place, patrol) {
+  if (!tick(8, mode)) return;
+  say('Поспал (' + place + ').', 'good');
+  if (Math.random() < theftP && S.cash.RUB >= 20) {
+    const l = Math.round(S.cash.RUB * rand(15, 35) / 100);
+    S.cash.RUB -= l; say('Пока спал, обшарили карманы: -' + l + ' ₽.', 'bad'); note('error');
+  } else if (patrol && Math.random() < 0.2) {
+    enUp(-15); S.warm = clamp(S.warm - 6); say('Патруль выгнал из зала посреди ночи.', 'bad');
+  }
+  maybeEvent(0.15);
+}
+function waitStreet() { if (!tick(1, 'out')) return; say('Постоял, подумал о вечном.'); maybeEvent(0.25); }
+
+function streetActs(loc) {
+  const A = [], h = S.hour;
+  if (loc === 'yard') {
+    A.push(B('🍾', 'Искать бутылки', '2 ч', () => { if (!tick(2, 'out')) return; findBottles(3, 8); maybeEvent(0.25); }, freeLoad() > 0, 'Некуда класть тару'));
+    A.push(B('🗑️', 'Рыться в мусорке', '1 ч', dumpster));
+    A.push(B('🙏', 'Просить у подъезда', '1 ч, мало', () => beg(0, 20, 0.05)));
+    A.push(B('😴', 'Спать на лавке', '8 ч, риск', () => sleepStreet('sleepOut', 0.12, 'лавка во дворе')));
+  }
+  if (loc === 'market') {
+    const mo = inH(8, 20), cl = 'Рынок закрыт (8-20)';
+    A.push(B('🙏', 'Просить у входа', '1 ч', () => beg(5, 40, 0.15), mo, cl));
+    const canW = mo && S.energy >= 30 && h <= 16;
+    A.push(B('📦', 'Грузчиком', '3 ч, 110-200 ₽', () => {
+      if (!tick(3, 'out')) return;
+      enUp(-14); const p = rand(110, 200); earn(p); say('Разгрузил фуру. Заплатили ' + p + ' ₽.', 'good'); maybeEvent(0.2);
+    }, canW, !mo ? cl : S.energy < 30 ? 'Нет сил' : 'Набирают до 17:00'));
+    A.push(B('🛍️', 'Магазин', 'еда и вещи', () => { M.fn = () => shopHTML(1, true); }, mo, cl));
+  }
+  if (loc === 'station') {
+    A.push(B('🙏', 'Просить на вокзале', '1 ч, риск', () => beg(8, 70, 0.25)));
+    A.push(B('♨️', 'Погреться в зале', '2 ч', () => {
+      if (!tick(2, 'in')) return;
+      say('Отогрелся в зале ожидания.', 'good');
+      if (Math.random() < 0.2) police(); else maybeEvent(0.1);
+    }));
+    A.push(B('🥪', 'Киоск', 'еда +30% к цене', () => { M.fn = () => shopHTML(1.3, false); }));
+    A.push(B('😴', 'Спать в зале', '8 ч, тепло, риск', () => sleepStreet('sleepIn', 0.25, 'зал ожидания', true)));
+  }
+  if (loc === 'scrap') {
+    const so = inH(9, 18), has = S.bottles + S.metal > 0;
+    A.push(B('💰', 'Сдать тару и лом', S.bottles + '×' + BOTTLE + ' + ' + S.metal + '×' + METAL + ' ₽', () => {
+      const sum = S.bottles * BOTTLE + S.metal * METAL;
+      earn(sum); say('Сдал тару и лом на ' + sum + ' ₽.', 'good'); S.bottles = 0; S.metal = 0; note('success');
+    }, so && has, !so ? 'Пункт закрыт (9-18)' : 'Нечего сдавать'));
+    A.push(B('🔩', 'Искать металлолом', '3 ч', () => {
+      if (!tick(3, 'out')) return;
+      const n = Math.min(rand(1, 4), Math.floor(freeLoad() / 3));
+      S.metal += n; say(n ? 'Откопал лома: ' + n + ' кг.' : 'Ничего путного.', n ? 'good' : '');
+      if (Math.random() < 0.18) { hurt(8); say('Порезался о ржавую арматуру.', 'bad'); }
+      maybeEvent(0.15);
+    }, freeLoad() >= 3, 'Некуда класть'));
+    A.push(B('🍾', 'Искать бутылки', '2 ч', () => { if (!tick(2, 'out')) return; findBottles(4, 10); maybeEvent(0.25); }, freeLoad() > 0, 'Некуда класть тару'));
+    A.push(B('😴', 'Спать в вагончике', '8 ч, холодно', () => sleepStreet('sleepOut', 0.05, 'заброшенный вагончик')));
+  }
+  if (loc === 'shelter') {
+    const soup = inH(12, 15) && S.soupDay !== S.day;
+    A.push(B('🍲', 'Бесплатный суп', '1 ч, раз в день', () => {
+      if (!tick(1, 'in')) return;
+      S.soupDay = S.day; eat(35); S.warm = clamp(S.warm + 12);
+      say('Волонтёры налили горячего супа. Благодать.', 'good'); maybeEvent(0.1);
+    }, soup, S.soupDay === S.day ? 'Сегодня уже ел' : 'Раздача 12-15'));
+    const bed = inH(19, 24) && S.shelterFull !== S.day;
+    A.push(B('🛌', 'Переночевать', '8 ч, безопасно', () => {
+      if (Math.random() < 0.75) { sleepStreet('sleepIn', 0, 'приют'); if (!S.over && Math.random() < 0.05) { hurt(5); say('Клопы. Чешешься.', 'bad'); } }
+      else { S.shelterFull = S.day; say('Мест нет. Приходи завтра пораньше.', 'bad'); }
+    }, bed, S.shelterFull === S.day ? 'Мест нет до завтра' : 'Приём 19-23'));
+    A.push(B('♨️', 'Посидеть в тепле', '2 ч', () => {
+      if (!tick(2, 'in')) return;
+      say('Посидел в тепле, отошли пальцы.', 'good'); maybeEvent(0.1);
+    }, inH(8, 21), 'Закрыто до 8:00'));
+    const sw = inH(9, 17);
+    if (S.pass === 0) {
+      A.push(B('🪪', 'Подать на паспорт', '1500 ₽, готов через 3 дня', () => {
+        if (!pay(1500)) return toast('Не хватает денег');
+        if (!tick(1, 'in')) return;
+        S.pass = 1; S.passDay = S.day + 3; say('Соцработник оформил заявление на паспорт. Ждать 3 дня.', 'good'); note('success');
+      }, sw && rub() >= 1500, !sw ? 'Соцработник 9-17' : 'Нужно 1500 ₽'));
+    } else if (S.pass === 1) {
+      A.push(B('🪪', 'Забрать паспорт', S.day >= S.passDay ? 'готов!' : 'будет на день ' + S.passDay, () => {
+        if (!tick(1, 'in')) return;
+        S.pass = 2; say('Паспорт на руках. Теперь ты снова человек с документами.', 'good'); note('success');
+      }, sw && S.day >= S.passDay, !sw ? 'Соцработник 9-17' : 'Ещё не готов'));
+    }
+  }
+  A.push(B('⏳', 'Переждать', '1 ч', waitStreet));
+  return A;
+}
+function shopHTML(mark, gear) {
+  let h = '<h2>' + (gear ? '🛍️ Рынок' : '🥪 Киоск') + '</h2><p>Деньги: <b>' + mny(rub()) + '</b></p><div class="sec">Еда</div>';
+  FOOD1.forEach(f => {
+    const p = Math.ceil(f.p * mark);
+    h += '<div class="item"><span class="ic">' + f.ic + '</span><div class="tx">' + f.n + '<small>+' + f.f + ' сытости' + (f.w ? ', +' + f.w + ' тепла' : '') + '</small></div>' +
+      mini(p + ' ₽', () => {
+        if (!pay(p)) return toast('Не хватает денег');
+        eat(f.f); if (f.w) S.warm = clamp(S.warm + f.w); say(f.ic + ' ' + f.n + ' за ' + p + ' ₽.'); hap();
+      }, rub() >= p) + '</div>';
+  });
+  if (gear) {
+    h += '<div class="sec">Вещи</div>';
+    GEAR.forEach(g => {
+      h += '<div class="item"><span class="ic">' + g.ic + '</span><div class="tx">' + g.n + '<small>' + g.d + '</small></div>' +
+        mini(S[g.id] ? 'Есть' : g.p + ' ₽', () => {
+          if (!pay(g.p)) return toast('Не хватает денег');
+          S[g.id] = true; say(g.ic + ' Купил: ' + g.n + '.', 'good'); note('success');
+        }, !S[g.id] && rub() >= g.p) + '</div>';
+    });
+  }
+  return h + closeBtn();
+}
+function streetView(loc) {
+  const L = LOCS[loc], t = temp(S.day, S.hour);
+  const g = (S.jacket ? '🧥' : '') + (S.bag ? '🛏️' : '') + (S.cart ? '🛒' : '');
+  return box('<div style="display:flex;gap:12px;align-items:center"><div style="font-size:36px">' + L.ic + '</div><div style="flex:1"><b>' + L.n + '</b><div class="muted">' + L.d + '</div></div><div class="muted" style="text-align:right">' + (t <= -5 ? '❄️ ' : '🌡 ') + t + '°C<br>🎒 ' + load() + '/' + cap() + ' ' + g + '<br>🍾' + S.bottles + ' 🔩' + S.metal + '</div></div>') + grid(streetActs(loc));
+}
+STREET.forEach(id => { TABS[id] = { ic: LOCS[id].ic, n: LOCS[id].n, from: 1, to: 1, view: () => streetView(id) }; });
+
+GOALS[1] = () => ({
+  items: [
+    { t: 'Паспорт', done: S.pass === 2, v: S.pass === 1 ? 'готовится до дня ' + S.passDay : S.pass === 0 ? 'подай в приюте, 1500 ₽' : '' },
+    { t: 'Деньги на комнату', cur: rub(), need: 3000 }
+  ],
+  btn: '🔑 Снять комнату за 3 000 ₽', can: S.pass === 2 && rub() >= 3000,
+  go() { pay(3000); S.housing = 1; S.arrears = 0; say('Ключи от комнаты в общаге. Тёплая батарея и чайник.', 'good'); setStage(2); }
+});
+
+/* --- 04_city.js --- */
+/* ============ ЭТАПЫ 2-5: ДОМ, РАБОТА, УЧЁБА, ТРАНСПОРТ ============ */
+const MAJ = () => MAJORS.find(m => m.id === S.major) || MAJORS[2];
+const commute = () => TRANS[S.transport].c;
+const stagePrice = k => k; // зарезервировано под инфляцию
+
+/* ---------- ежедневные расходы ---------- */
+function payBill(n, why) {
+  if (n <= 0) return true;
+  if (S.cash.RUB >= n) { S.cash.RUB -= n; S.arrears = 0; return true; }
+  const lack = n - S.cash.RUB; S.cash.RUB = 0; S.debt += lack; S.arrears++;
+  say('Не хватило денег (' + why + '). Долг растёт.', 'bad');
+  if (S.arrears >= 3) evict();
+  return false;
+}
+function evict() {
+  S.arrears = 0;
+  if (S.stage <= 3) {
+    S.housing = 0; S.debt = 0; S.transport = 0; S.job = false; S.cash.RUB = 0;
+    fall(1, 'Не хватило на жильё три дня подряд. Тебя выселили.');
+  } else if (S.stage <= 5) {
+    if (S.housing > 1 && !HOUSING[S.housing].own) { S.housing = 1; say('Съёмную квартиру пришлось сдать. Вернулся в общагу.', 'bad'); }
+    else if (S.stage >= 4) { S.job = false; S.debt = Math.max(0, S.debt - 50000); fall(2, 'Долги задавили: потерял работу и откатился на ступень трудяги.'); }
+  }
+}
+DAILY.push(() => {
+  if (S.stage === 1 || S.stage >= 10) return;
+  if (S.stage === 3) earn(100);
+  payBill(HOUSING[S.housing].up + (TRANS[S.transport].up || 0), 'жильё и транспорт');
+  S.azart = Math.max(0, S.azart - 12);
+});
+
+/* ---------- случайные события ---------- */
+const EV2 = [
+  { s: [2, 3], run: () => { eat(25); moodUp(4); say('Сосед угостил обедом. Приятно.', 'good'); } },
+  { s: [2, 3], run: () => { const l = Math.min(rub(), rand(200, 800)); S.cash.RUB -= l; say('Потерял кошелёк: -' + l + ' ₽.', 'bad'); } },
+  { s: [2, 3], run: () => { earn(500); say('Начальник дал премию 500 ₽.', 'good'); } },
+  { s: [2, 5], run: () => { hurt(8); moodUp(-5); say('Простудился. Нос не дышит.', 'bad'); } },
+  { s: [2, 5], run: () => { moodUp(10); say('Хорошие вести из дома. Настроение выросло.', 'good'); } },
+  { s: [4, 5], run: () => { earn(30000); say('Налоговый вычет: +30 тыс ₽.', 'good'); } },
+  { s: [4, 5], cond: () => S.transport >= 3, run: () => { const l = Math.min(rub(), 5000); S.cash.RUB -= l; say('Штраф ГИБДД: -5 тыс ₽.', 'bad'); } },
+  { s: [4, 5], run: () => { moodUp(15); enUp(-10); say('Корпоратив. Весело, но утром тяжело.', 'good'); } },
+  { s: [4, 5], run: () => { moodUp(-12); say('Выгорание накатило волной.', 'bad'); } },
+  { s: [3, 5], run: () => { const l = Math.min(rub(), rand(2000, 8000)); S.cash.RUB -= l; say('Сломался ноутбук. Ремонт: -' + fmt(l) + ' ₽.', 'bad'); } }
+];
+DAILY.push(() => {
+  if (S.stage < 2 || S.stage > 5 || Math.random() > 0.22) return;
+  const pool = EV2.filter(e => S.stage >= e.s[0] && S.stage <= e.s[1] && (!e.cond || e.cond()));
+  if (pool.length) pool[rand(0, pool.length - 1)].run();
+});
+// сокращение специалиста и работа команды
+DAILY.push(() => {
+  if (S.stage === 4 && S.job && Math.random() < 0.012) { S.job = false; say('📉 Сокращение: компания урезает штат. Ищи новую работу.', 'bad'); }
+  if (S.stage === 5) {
+    const target = 30 + 8 * S.team + (S.plan ? 10 : 0);
+    S.plan = 0;
+    S.perf = clamp(S.perf + (target - S.perf) * 0.25 + rf(-3, 3));
+    payBill(S.team * 10000, 'зарплаты команды');
+    S.lowPerf = S.perf < 25 ? S.lowPerf + 1 : 0;
+    if (S.day % 30 === 0 && S.perf >= 60) { earn(800000); say('Квартальный бонус: +800 тыс ₽.', 'good'); }
+    if (S.lowPerf >= 5) { S.team = 0; S.lowPerf = 0; S.job = true; S.jobLvl = 2; fall(4, 'Сокращение: отдел не выполнил план. Вернулся на должность ведущего специалиста.'); }
+  }
+});
+
+/* ---------- ДОМ ---------- */
+function sleepHome(h) {
+  if (!tick(h, 'sleepHome')) return;
+  say(h >= 6 ? '😴 Выспался.' : '💤 Вздремнул.', 'good');
+}
+function eatTier(f) {
+  if (!pay(f.p)) return toast('Не хватает денег');
+  if (!tick(0.5, 'home')) return;
+  eat(f.f); moodUp(f.m || 0); heal(f.h || 0); enUp(f.e || 0);
+  say(f.ic + ' ' + f.n + ' за ' + mny(f.p) + '.');
+}
+function doLeisure(l) {
+  if (!pay(l.cost)) return toast('Не хватает денег');
+  if (l.days) { waitDays(l.days); } else if (!tick(l.h, 'home')) return;
+  moodUp(l.mood); heal(l.hp || 0); enUp(l.en || 0);
+  if (l.hp && l.hp < 0) hurt(-l.hp);
+  say(l.ic + ' ' + l.n + (l.cost ? ' (' + mny(l.cost) + ')' : '') + '. Настроение +' + l.mood + '.', 'good');
+}
+function moveTo(i) {
+  const H = HOUSING[i], cur = HOUSING[S.housing];
+  const cost = H.own ? H.price : (H.fee || 0), refund = cur.own ? cur.price * 0.9 : 0;
+  if (rub() + refund < cost) return toast('Не хватает денег');
+  S.cash.RUB += refund - cost; S.housing = i; S.arrears = 0;
+  say(H.ic + ' Переехал: ' + H.n + '.', 'good'); note('success'); M.fn = null;
+}
+function housingModal() {
+  let h = '<h2>🏘️ Жильё</h2><p>Лучше жильё значит быстрее восстановление сил и настроения.</p>';
+  HOUSING.forEach((H, i) => {
+    if (i === 0 || H.only || (H.min || 2) > S.stage) return;
+    const cur = i === S.housing, cost = H.own ? H.price : (H.fee || 0), refund = HOUSING[S.housing].own ? HOUSING[S.housing].price * 0.9 : 0;
+    h += '<div class="item"><span class="ic">' + H.ic + '</span><div class="tx">' + H.n + '<small>' + (H.own ? 'покупка ' + mny(H.price) + ', ' : 'залог ' + mny(H.fee || 0) + ', ') + mny(H.up) + '/день, сон ×' + H.q + '</small></div>' +
+      mini(cur ? 'Здесь' : 'Переехать', () => moveTo(i), !cur && rub() + refund >= cost) + '</div>';
+  });
+  return h + closeBtn();
+}
+function homeView() {
+  const H = HOUSING[S.housing], tr = TRANS[S.transport];
+  let h = box('<b>' + H.ic + ' ' + H.n + '</b><div class="muted">Расходы ' + mny(H.up + (tr.up || 0)) + '/день · ' + tr.ic + ' ' + tr.n + ' · дорога ' + tr.c + ' ч</div>');
+  h += sec('Отдых');
+  h += grid([
+    B('😴', 'Спать', '8 ч', () => sleepHome(8)),
+    B('💤', 'Вздремнуть', '2 ч', () => sleepHome(2)),
+    B('🏘️', 'Сменить жильё', 'аренда и покупка', () => { M.fn = housingModal; })
+  ].concat(S.stage >= 4 ? [B('⏭', 'Ждать день', 'пока всё идёт', () => waitDays(1))] : [])
+    .concat(S.stage >= 5 ? [B('⏩', 'Ждать неделю', '7 дней', () => waitDays(7))] : []));
+  h += sec('Еда');
+  h += grid(FOODS.filter(f => f.min <= S.stage).map(f => B(f.ic, f.n, mny(f.p) + ', +' + f.f + (f.m > 0 ? ', 🙂+' + f.m : ''), () => eatTier(f), rub() >= f.p, 'Нужно ' + mny(f.p))));
+  h += sec('Досуг');
+  h += grid(LEISURE.filter(l => l.min <= S.stage).map(l => B(l.ic, l.n, (l.days ? l.days + ' дн' : l.h + ' ч') + (l.cost ? ', ' + mny(l.cost) : ', бесплатно') + ', 🙂+' + l.mood, () => doLeisure(l), rub() >= l.cost, 'Нужно ' + mny(l.cost))));
+  return h;
+}
+TABS.home = { ic: '🏠', n: 'Дом', from: 2, to: 10, view: homeView };
+
+/* ---------- РАБОТА ---------- */
+function shift(j, payv) {
+  if (!tick(commute(), 'out')) return;
+  if (!tick(j.h, 'out')) return;
+  enUp(-j.en); moodUp(-j.mo); S.did[j.id] = 1; earn(payv);
+  say(j.ic + ' ' + j.n + ': +' + mny(payv), 'good');
+}
+function jobsGrid(list) {
+  return grid(list.map(j => {
+    let p = j.pay;
+    if (j.tips) p = Math.round(j.pay * (1 + 0.15 * Math.min(4, S.transport)));
+    if (j.free) p = Math.round((300 + 30 * S.edu.uni) * MAJ().mult);
+    const nightOk = !j.night || S.hour >= 21 || S.hour <= 2;
+    const ok = !S.did[j.id] && S.energy >= 25 && nightOk;
+    const why = S.did[j.id] ? 'Сегодня уже работал' : S.energy < 25 ? 'Нет сил' : 'Только с 21:00';
+    return B(j.ic, j.n, j.h + ' ч + дорога · ~' + mny(p), () => shift(j, j.tips ? Math.round(p * rf(0.8, 1.3)) : p), ok, why);
+  }));
+}
+function careerView() {
+  const m = MAJ(); const nx = S.jobLvl < 2 ? CAREER_XP[S.jobLvl + 1] : null;
+  const pay = Math.round(CAREER_PAY[S.jobLvl] * m.mult * (S.mba ? 1.25 : 1));
+  let h = box('<b>' + (S.job ? m.ic + ' ' + m.titles[S.jobLvl] : '😶 Без работы') + '</b><div class="muted">Опыт: ' + S.jobXp + (nx ? '/' + nx : ' (максимум)') + ' · смена ' + mny(pay) + (S.mba ? ' (MBA +25%)' : '') + '</div>');
+  const A = [];
+  if (S.job) {
+    A.push(B('💼', 'Рабочая смена', '9 ч + дорога · ' + mny(pay), () => {
+      if (!tick(commute(), 'out')) return; if (!tick(9, 'out')) return;
+      enUp(-10); moodUp(-m.mo); S.did.career = 1; earn(pay); S.jobXp++;
+      say('💼 Смена закрыта: +' + mny(pay), 'good');
+      if (S.jobLvl < 2 && S.jobXp >= CAREER_XP[S.jobLvl + 1]) { S.jobLvl++; say('🎉 Повышение: ' + m.titles[S.jobLvl] + '!', 'good'); note('success'); }
+    }, !S.did.career && S.energy >= 25, S.did.career ? 'Сегодня уже работал' : 'Нет сил'));
+  } else {
+    A.push(B('🔎', 'Искать работу', '3 ч, шанс 75%', () => {
+      if (!tick(3, 'out')) return;
+      if (Math.random() < 0.75) { S.job = true; say('Нашёл работу: ' + m.titles[S.jobLvl] + '.', 'good'); } else say('Собеседования без результата.', 'bad');
+    }));
+  }
+  A.push(B('💻', 'Фриланс', '3 ч · ~' + mny(Math.round((300 + 30 * S.edu.uni) * m.mult * 2)), () => shift({ id: 'free', n: 'Фриланс', ic: '💻', h: 3, en: 6, mo: 4 }, Math.round((300 + 30 * S.edu.uni) * m.mult * 2)), !S.did.free && S.energy >= 25, S.did.free ? 'Сегодня уже' : 'Нет сил'));
+  return h + grid(A);
+}
+function managerView() {
+  const pay = Math.round(150000 * (0.5 + S.perf / 100));
+  let h = box('<b>📊 Руководитель отдела</b><div class="muted">Команда ' + S.team + '/8 · KPI ' + Math.round(S.perf) + '% · зарплаты ' + mny(S.team * 10000) + '/день' + (S.lowPerf ? ' · ⚠️ KPI ниже 25% дней: ' + S.lowPerf + '/5' : '') + '</div>');
+  h += grid([
+    B('💼', 'Работать', '9 ч + дорога · ' + mny(pay), () => {
+      if (!tick(commute(), 'out')) return; if (!tick(9, 'out')) return;
+      enUp(-10); moodUp(-8); S.did.mgr = 1; earn(pay); say('📊 Рабочий день: +' + mny(pay), 'good');
+    }, !S.did.mgr && S.energy >= 25, S.did.mgr ? 'Сегодня уже' : 'Нет сил'),
+    B('🗣️', 'Планёрка', '1 ч, KPI вверх', () => { if (!tick(1, 'out')) return; S.plan = 1; S.did.plan = 1; S.perf = clamp(S.perf + 8); say('Планёрка прошла бодро. KPI растёт.', 'good'); }, !S.did.plan, 'Уже проводил'),
+    B('🧑‍💻', 'Нанять сотрудника', mny(300000), () => { if (!pay2(300000)) return; S.team++; say('Новый сотрудник в команде.', 'good'); }, S.team < 8 && rub() >= 300000, S.team >= 8 ? 'Команда полная' : 'Нужно 300 тыс'),
+    B('🚪', 'Уволить', 'снижает расходы', () => { S.team--; say('Расстался с сотрудником.'); }, S.team > 0, 'Некого')
+  ]);
+  return h;
+}
+const pay2 = n => { if (!pay(n)) { toast('Не хватает денег'); return false; } return true; };
+function workView() {
+  if (S.stage === 2) return box('<b>Смены без договора</b><div class="muted">Пока нет образования, берут на тяжёлую работу. Чем лучше транспорт, тем быстрее добираешься и больше чаевых курьеру.</div>') + jobsGrid(JOBS2);
+  if (S.stage === 3) return box('<b>Подработки студента</b><div class="muted">Стипендия 100 ₽/день капает сама. Фриланс платит тем больше, чем больше ты выучил.</div>') + jobsGrid(JOBS3);
+  if (S.stage === 4) return careerView();
+  if (S.stage === 5) return managerView();
+  return '';
+}
+TABS.work = { ic: '💼', n: 'Работа', from: 2, to: 5, view: workView };
+
+/* ---------- УЧЁБА ---------- */
+const examNeed = () => EXAM_STEP * (S.edu.exams + 1);
+function studyGain(base) { return base * (0.5 + 0.5 * (S.energy + S.mood) / 200); }
+function studyView() {
+  let h = '';
+  const A = [];
+  if (S.stage === 2) {
+    h += box('<b>🌙 Вечерняя школа</b><div class="muted">Аттестат: ' + Math.floor(S.edu.school) + '/' + SCHOOL_PTS + ' баллов. Без него дальше не пустят.</div>');
+    A.push(B('📚', 'Вечерние занятия', '3 ч + дорога', () => {
+      if (!tick(commute(), 'out')) return; if (!tick(3, 'out')) return;
+      const g = studyGain(3); S.edu.school = Math.min(SCHOOL_PTS, S.edu.school + g);
+      enUp(-8); moodUp(-5); S.did.study = 1; say('📚 Урок усвоен: +' + g.toFixed(1) + ' балла.', 'good');
+      if (S.edu.school >= SCHOOL_PTS) say('🎓 Аттестат получен!', 'good');
+    }, !S.did.study && S.edu.school < SCHOOL_PTS && S.energy >= 20, S.edu.school >= SCHOOL_PTS ? 'Аттестат уже есть' : S.did.study ? 'Сегодня уже ходил' : 'Нет сил'));
+  } else if (S.stage === 3) {
+    h += box('<b>🏫 ' + MAJ().ic + ' ' + MAJ().n + '</b><div class="muted">Баллы: ' + Math.floor(S.edu.uni) + '/' + UNI_PTS + ' · сессий сдано: ' + S.edu.exams + '/4' + (S.edu.uni >= examNeed() && S.edu.exams < 4 ? ' · пора на сессию!' : '') + '</div>');
+    const cap = () => Math.min(UNI_PTS, examNeed());
+    A.push(B('🏫', 'Лекции', '4 ч + дорога', () => {
+      if (!tick(commute(), 'out')) return; if (!tick(4, 'out')) return;
+      const g = studyGain(3); S.edu.uni = Math.min(cap(), S.edu.uni + g); enUp(-10); moodUp(-6); S.did.lect = 1; say('🏫 Лекции: +' + g.toFixed(1) + ' балла.', 'good');
+    }, !S.did.lect && S.edu.uni < cap() && S.energy >= 20, S.edu.uni >= cap() ? 'Сначала сессия' : S.did.lect ? 'Сегодня уже' : 'Нет сил'));
+    A.push(B('📖', 'Самоподготовка', '3 ч дома', () => {
+      if (!tick(3, 'home')) return;
+      const g = studyGain(2.5); S.edu.uni = Math.min(cap(), S.edu.uni + g); enUp(-8); moodUp(-4); S.did.self = 1; say('📖 Подготовка: +' + g.toFixed(1) + ' балла.', 'good');
+    }, !S.did.self && S.edu.uni < cap() && S.energy >= 20, S.edu.uni >= cap() ? 'Сначала сессия' : S.did.self ? 'Сегодня уже' : 'Нет сил'));
+    A.push(B('📝', 'Сдать сессию', '2 ч, шанс от сил и настроения', () => {
+      if (!tick(commute() + 2, 'out')) return;
+      S.did.exam = 1;
+      const p = clamp(0.4 + 0.4 * S.energy / 100 + 0.2 * S.mood / 100, 0, 0.95);
+      if (Math.random() < p) { S.edu.exams++; moodUp(8); say('📝 Сессия сдана! (' + S.edu.exams + '/4)', 'good'); note('success'); }
+      else { moodUp(-8); say('📝 Завал. Пересдача завтра.', 'bad'); }
+    }, !S.did.exam && S.edu.uni >= examNeed() && S.edu.exams < 4, S.did.exam ? 'Пересдача завтра' : S.edu.exams >= 4 ? 'Все сессии сданы' : 'Не хватает баллов'));
+  } else if (S.stage === 4) {
+    h += box('<b>🎓 Повышение квалификации</b><div class="muted">Курсы ускоряют карьеру. Иностранный вуз (MBA) нужен для этапа руководителя.</div>');
+    A.push(B('🧠', 'Курсы', '3 ч, ' + mny(15000) + ', +3 опыта', () => {
+      if (!pay2(15000)) return; if (!tick(commute() + 3, 'out')) return;
+      S.jobXp += 3; enUp(-6); moodUp(-3); S.did.course = 1; say('🧠 Курсы пройдены: +3 к опыту.', 'good');
+      if (S.jobLvl < 2 && S.jobXp >= CAREER_XP[S.jobLvl + 1]) { S.jobLvl++; say('🎉 Повышение: ' + MAJ().titles[S.jobLvl] + '!', 'good'); }
+    }, !S.did.course && rub() >= 15000 && S.job, !S.job ? 'Нужна работа' : S.did.course ? 'Сегодня уже' : 'Нужно 15 тыс'));
+    h += sec('Иностранный вуз (MBA)');
+    const visa = S.edu.visa;
+    if (S.mba) h += box('✅ MBA получен. Зарплата +25%.');
+    else {
+      h += box('Виза: ' + (visa === 0 ? 'нет' : visa === 1 ? 'в обработке до дня ' + S.edu.visaDay : 'готова') + '<br>Обучение: 6000 € + проживание 2000 €, 20 дней вдали от работы. Евро купи в разделе «Банк».');
+      if (visa === 0) A.push(B('🛂', 'Оформить визу', '150 €, 3 дня', () => { if (!pay(150, 'EUR')) return toast('Нужно 150 € (купи в банке)'); S.edu.visa = 1; S.edu.visaDay = S.day + 3; say('Подал документы на визу.', 'good'); }, S.cash.EUR >= 150, 'Нужно 150 €'));
+      if (visa === 1) A.push(B('🛂', 'Проверить визу', S.day >= S.edu.visaDay ? 'готова' : 'будет на день ' + S.edu.visaDay, () => { S.edu.visa = 2; say('Виза получена!', 'good'); note('success'); }, S.day >= S.edu.visaDay, 'Ещё не готова'));
+      if (visa === 2) A.push(B('✈️', 'Поехать на MBA', '8000 €, 20 дней', () => {
+        if (!pay(8000, 'EUR')) return toast('Нужно 8000 €');
+        for (let i = 0; i < 20; i++) newDay();
+        S.mba = true; S.food = 70; S.energy = 85; S.mood = 85; S.hour = 8;
+        say('🎓 Вернулся с дипломом MBA. Зарплата +25%.', 'good'); note('success');
+      }, S.cash.EUR >= 8000, 'Нужно 8000 €'));
+    }
+  } else h += box('Здесь больше нечему учиться.');
+  return h + grid(A);
+}
+TABS.study = { ic: '🎓', n: 'Учёба', from: 2, to: 4, view: studyView };
+
+/* ---------- ТРАНСПОРТ ---------- */
+function buyTrans(i) {
+  const t = TRANS[i], old = TRANS[S.transport], cur = t.cur || 'RUB';
+  if (S.cash[cur] < t.price) return toast('Не хватает денег');
+  S.cash[cur] -= t.price;
+  if (old.price) S.cash[old.cur || 'RUB'] += old.price * 0.5;
+  S.transport = i; say(t.ic + ' Новый транспорт: ' + t.n + '.', 'good'); note('success');
+}
+function garageView() {
+  const cu = TRANS[S.transport];
+  let h = box('<b>' + cu.ic + ' ' + cu.n + '</b><div class="muted">Дорога к работе и учёбе: ' + cu.c + ' ч. Содержание ' + mny(cu.up || 0) + '/день. При покупке нового старый уходит за 50%.</div>');
+  h += grid(TRANS.map((t, i) => ({ t, i })).filter(x => x.i > S.transport && (x.t.min || 2) <= S.stage).map(x => {
+    const cur = x.t.cur || 'RUB';
+    return B(x.t.ic, x.t.n, mny(x.t.price, cur) + ' · дорога ' + x.t.c + ' ч', () => buyTrans(x.i), S.cash[cur] >= x.t.price, 'Нужно ' + mny(x.t.price, cur));
+  }));
+  return h;
+}
+TABS.garage = { ic: '🚗', n: 'Транспорт', from: 2, to: 10, view: garageView };
+
+/* ---------- ЦЕЛИ ЭТАПОВ 2-5 ---------- */
+GOALS[2] = () => ({
+  items: [
+    { t: 'Аттестат', cur: Math.floor(S.edu.school), need: SCHOOL_PTS },
+    { t: 'Взнос за поступление', cur: rub(), need: 15000, money: 1 }
+  ],
+  btn: '🎓 Поступить в университет (15 000 ₽)', can: S.edu.school >= SCHOOL_PTS && rub() >= 15000,
+  go() { pay(15000); S.housing = 2; S.arrears = 0; setStage(3); M.fn = majorModal; }
+});
+function majorModal() {
+  return '<h2>🎓 Выбери специальность</h2><p>От неё зависит зарплата и характер работы.</p>' + MAJORS.map(m =>
+    '<div class="item"><span class="ic">' + m.ic + '</span><div class="tx">' + m.n + '<small>зарплата ×' + m.mult + ', стресс ' + (m.mo > 10 ? 'высокий' : m.mo > 8 ? 'средний' : 'низкий') + '</small></div>' +
+    mini('Выбрать', () => { S.major = m.id; say('Специальность: ' + m.n + '.', 'good'); M.fn = () => stageModal(3); }) + '</div>').join('');
+}
+GOALS[3] = () => ({
+  items: [
+    { t: 'Баллы учёбы', cur: Math.floor(S.edu.uni), need: UNI_PTS },
+    { t: 'Сессии сданы', cur: S.edu.exams, need: 4 }
+  ],
+  btn: '📜 Получить диплом и начать карьеру', can: S.edu.exams >= 4,
+  go() { S.job = true; S.jobLvl = 0; S.jobXp = 0; S.housing = 1; S.edu.visa = 0; setStage(4); }
+});
+GOALS[4] = () => ({
+  items: [
+    { t: 'Должность: ведущий', done: S.jobLvl >= 2 && S.job, v: S.job ? S.jobXp + '/' + CAREER_XP[2] + ' опыта' : 'нужна работа' },
+    { t: 'MBA за рубежом', done: S.mba }
+  ],
+  btn: '📊 Возглавить отдел', can: S.jobLvl >= 2 && S.job && S.mba,
+  go() { S.team = 0; S.perf = 50; S.lowPerf = 0; setStage(5); }
+});
+GOALS[5] = () => ({
+  items: [{ t: 'Капитал для бизнеса', cur: netWorth(), need: 4e6, money: 1 }],
+  btn: '🏪 Открыть своё дело (3 млн ₽)', can: netWorth() >= 4e6 && rub() >= 3e6,
+  go() { pay(3e6); S.biz = { units: [0], brand: 0, sup: 1, mgr: false, neglect: 0, crisis: 0, month: 0 }; S.team = 0; setStage(6); }
+});
+
+/* --- 05_bank.js --- */
+/* ============ БАНК, ОБМЕННИК, БИРЖА, НЕДВИЖИМОСТЬ ============ */
+function spark(arr, w = 84, h = 24) {
+  if (!arr || arr.length < 2) return '<span class="muted">...</span>';
+  const mn = Math.min(...arr), mx = Math.max(...arr), up = arr[arr.length - 1] >= arr[0];
+  const pts = arr.map((v, i) => (i / (arr.length - 1) * w).toFixed(1) + ',' + (h - 2 - ((v - mn) / (mx - mn || 1)) * (h - 4)).toFixed(1)).join(' ');
+  return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><polyline fill="none" stroke="' + (up ? '#4ade80' : '#f87171') + '" stroke-width="2" points="' + pts + '"/></svg>';
+}
+const pctTxt = d => '<span class="' + (d >= 0 ? 'up' : 'dn') + '">' + (d >= 0 ? '+' : '') + (d * 100).toFixed(1) + '%</span>';
+
+/* ---------- ежедневные хуки ---------- */
+DAILY.push(() => {
+  const f = S.fx, g = gauss() * 0.008;
+  const shock = Math.random() < 0.04, sgn = Math.random() < 0.55 ? 1 : -1;
+  for (const c of ['USD', 'EUR', 'CNY']) {
+    f.b[c] *= 1.0004;
+    const prev = f.r[c];
+    let ret = (f.b[c] - prev) / f.b[c] * 0.05 + g + gauss() * 0.006;
+    if (shock) ret += sgn * rf(0.05, 0.12) * (c === 'CNY' ? 0.7 : 1);
+    f.r[c] = Math.max(f.b[c] * 0.55, prev * (1 + ret));
+    f.d[c] = f.r[c] / prev - 1;
+    f.h[c].push(f.r[c]); if (f.h[c].length > 40) f.h[c].shift();
+  }
+  if (shock && S.stage >= 4) say(sgn > 0 ? '💱 Рубль обвалился: валюта резко дорожает!' : '💱 Рубль укрепился: валюта дешевеет.', sgn > 0 ? 'bad' : 'good');
+});
+DAILY.push(() => {
+  if (S.deposit > 0) S.deposit *= 1 + 0.16 / 365;
+  if (S.debt > 0) {
+    if (S.stage < 4) { const r = Math.min(S.debt, S.cash.RUB); S.cash.RUB -= r; S.debt -= r; }
+    else S.debt *= 1 + 0.2 / 365;
+  }
+});
+DAILY.push(() => {
+  const mkt = gauss() * 0.008 + (S.mkt || 0); S.mkt = (S.mkt || 0) * 0.75;
+  let hit = null;
+  if (Math.random() < 0.07) {
+    const big = Math.random() < 0.3, sgn = Math.random() < 0.5 ? 1 : -1;
+    if (big) { S.mkt = (S.mkt || 0) + sgn * rf(0.015, 0.035); if (S.stage >= 7) say(sgn > 0 ? '📰 Рынок взлетел на хороших новостях.' : '📰 Рынок падает: паника на бирже.', sgn > 0 ? 'good' : 'bad'); }
+    else { hit = { s: STOCKS[rand(0, STOCKS.length - 1)], d: sgn * rf(0.08, 0.2) }; }
+  }
+  for (const s of STOCKS) {
+    const o = S.stk[s.id];
+    let ret = s.drift + mkt * (s.vol / 0.02) + gauss() * s.vol;
+    if (hit && hit.s.id === s.id) { ret += hit.d; if (S.stage >= 7) say('📰 ' + s.n + (hit.d > 0 ? ' выросла на новостях.' : ' упала из-за скандала.'), hit.d > 0 ? 'good' : 'bad'); }
+    o.p = Math.max(1, o.p * (1 + ret));
+    o.h.push(o.p); if (o.h.length > 30) o.h.shift();
+  }
+  // недвижимость
+  const e = S.estate; e.price = Math.max(5e6, e.price * (1 + 0.0003 + gauss() * 0.004));
+  if (e.n > 0) earn(e.n * e.price * 0.0035);
+});
+
+/* ---------- обменник ---------- */
+function buyFx(c, pct) {
+  const spend = rub() * pct; if (spend < 1) return toast('Нет рублей');
+  const units = spend / (S.fx.r[c] * 1.015);
+  S.cash.RUB -= spend; S.cash[c] += units;
+  say('💱 Купил ' + units.toFixed(0) + ' ' + SYM[c] + ' за ' + mny(spend) + '.');
+}
+function sellFx(c, pct) {
+  const units = S.cash[c] * pct; if (units <= 0) return toast('Нечего продавать');
+  const got = units * S.fx.r[c] * 0.985;
+  S.cash[c] -= units; S.cash.RUB += got;
+  say('💱 Продал ' + units.toFixed(0) + ' ' + SYM[c] + ' за ' + mny(got) + '.');
+}
+const CUR_NAMES = { USD: 'Доллар', EUR: 'Евро', CNY: 'Юань' };
+function bankView() {
+  let h = box('<b>🏦 Банк и обменник</b><div class="muted">Курс купли на 1,5% дороже, продажи на 1,5% дешевле. Курс скачет каждый день, иногда резко.</div>');
+  h += sec('Валюта');
+  for (const c of ['USD', 'EUR', 'CNY']) {
+    h += '<div class="row2"><div class="nm"><b>' + CUR_NAMES[c] + ' ' + SYM[c] + '</b> ' + S.fx.r[c].toFixed(2) + ' ₽ ' + pctTxt(S.fx.d[c]) + '<small>у тебя: ' + S.cash[c].toFixed(0) + ' ' + SYM[c] + '</small></div>' + spark(S.fx.h[c]) +
+      '<div class="btns">' + mini('Купить 25%', () => buyFx(c, 0.25), rub() > 1) + mini('Купить всё', () => buyFx(c, 1), rub() > 1) + mini('Продать 50%', () => sellFx(c, 0.5), S.cash[c] > 0) + mini('Продать всё', () => sellFx(c, 1), S.cash[c] > 0) + '</div></div>';
+  }
+  h += sec('Вклад (16% годовых)');
+  h += '<div class="row2"><div class="nm">На вкладе: <b>' + mny(S.deposit) + '</b><small>проценты копятся каждый день</small></div><div class="btns">' +
+    mini('Положить 50%', () => { const x = rub() * 0.5; S.cash.RUB -= x; S.deposit += x; say('Положил на вклад ' + mny(x) + '.'); }, rub() > 1) +
+    mini('Положить всё', () => { S.deposit += rub(); S.cash.RUB = 0; say('Всё на вклад.'); }, rub() > 1) +
+    mini('Снять всё', () => { S.cash.RUB += S.deposit; S.deposit = 0; say('Снял вклад.'); }, S.deposit > 1) + '</div></div>';
+  h += sec('Кредит (20% годовых)');
+  const lim = Math.max(0, Math.max(50000, netWorth() * 0.5) - S.debt);
+  h += '<div class="row2"><div class="nm">Долг: <b class="' + (S.debt > 0 ? 'dn' : '') + '">' + mny(S.debt) + '</b><small>можно взять ещё: ' + mny(lim) + '</small></div><div class="btns">' +
+    mini('Взять 25%', () => { const x = lim * 0.25; S.debt += x; S.cash.RUB += x; say('Кредит ' + mny(x) + '.'); }, lim > 1000) +
+    mini('Взять всё', () => { S.debt += lim; S.cash.RUB += lim; say('Кредит ' + mny(lim) + '.'); }, lim > 1000) +
+    mini('Погасить 50%', () => { const x = Math.min(S.debt * 0.5, rub()); S.cash.RUB -= x; S.debt -= x; say('Погасил ' + mny(x) + '.'); }, S.debt > 1 && rub() > 1) +
+    mini('Погасить всё', () => { const x = Math.min(S.debt, rub()); S.cash.RUB -= x; S.debt -= x; say('Погасил ' + mny(x) + '.'); }, S.debt > 1 && rub() > 1) + '</div></div>';
+  return h;
+}
+TABS.bank = { ic: '🏦', n: 'Банк', from: 4, to: 10, view: bankView };
+
+/* ---------- биржа и недвижимость ---------- */
+function buyStock(id, pct) {
+  const o = S.stk[id], spend = rub() * pct; if (spend < o.p) return toast('Не хватает на акцию');
+  const q = Math.floor(spend / (o.p * 1.003)); if (q < 1) return;
+  S.cash.RUB -= q * o.p * 1.003; o.q += q; say('📈 Купил ' + q + ' акций ' + id + '.');
+}
+function sellStock(id, pct) {
+  const o = S.stk[id], q = Math.max(1, Math.floor(o.q * pct)); if (o.q < 1) return;
+  S.cash.RUB += q * o.p * 0.997; o.q -= q; say('📉 Продал ' + q + ' акций ' + id + '.');
+}
+function investView() {
+  let h = box('<b>📈 Биржа</b><div class="muted">Комиссия 0,3%. Новости двигают рынок. Диверсифицируй портфель.</div>');
+  let tot = 0;
+  STOCKS.forEach(s => {
+    const o = S.stk[s.id], prev = o.h.length > 1 ? o.h[o.h.length - 2] : o.p, d = o.p / prev - 1; tot += o.q * o.p;
+    h += '<div class="row2"><div class="nm"><b>' + s.n + '</b> ' + o.p.toFixed(1) + ' ₽ ' + pctTxt(d) + '<small>' + o.q + ' шт = ' + mny(o.q * o.p) + '</small></div>' + spark(o.h, 70) +
+      '<div class="btns">' + mini('Купить 25%', () => buyStock(s.id, 0.25), rub() >= o.p) + mini('Продать 50%', () => sellStock(s.id, 0.5), o.q > 0) + mini('Всё', () => sellStock(s.id, 1), o.q > 0) + '</div></div>';
+  });
+  h += box('Портфель: <b>' + mny(tot) + '</b>');
+  const e = S.estate;
+  h += sec('Недвижимость');
+  h += '<div class="row2"><div class="nm"><b>🏢 Коммерческое помещение</b> ' + mny(e.price) + '<small>у тебя ' + e.n + ' шт · аренда ' + mny(e.n * e.price * 0.0035) + '/день</small></div><div class="btns">' +
+    mini('Купить', () => { if (!pay2(e.price * 1.03)) return; e.n++; say('🏢 Купил помещение.', 'good'); }, rub() >= e.price * 1.03) +
+    mini('Продать', () => { e.n--; S.cash.RUB += e.price * 0.97; say('🏢 Продал помещение.'); }, e.n > 0) + '</div></div>';
+  return h;
+}
+TABS.invest = { ic: '📈', n: 'Биржа', from: 7, to: 10, view: investView };
+
+/* --- 06_casino.js --- */
+/* ===================== КАЗИНО ===================== */
+const CAS_BASE = { 2: 50, 3: 100, 4: 500, 5: 2000, 6: 10000, 7: 50000, 8: 500000, 9: 2e6, 10: 1e7 };
+const CAS_NAME = s => s <= 2 ? 'Подпольные автоматы' : s <= 6 ? 'Казино' : 'VIP-зал';
+const RED = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+const SLOT = [{ s: '🍒', w: 30, p: 10 }, { s: '🍋', w: 25, p: 15 }, { s: '🔔', w: 20, p: 25 }, { s: '⭐', w: 12, p: 60 }, { s: '💎', w: 8, p: 120 }, { s: '7️⃣', w: 5, p: 300 }];
+const SU = ['♠', '♥', '♦', '♣'];
+const cardName = r => ({ 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }[r] || r);
+const cardVal = r => r > 10 ? 10 : r;
+function handVal(h) { let t = h.reduce((a, c) => a + cardVal(c.r), 0); if (h.some(c => c.r === 1) && t + 10 <= 21) t += 10; return t; }
+const showHand = (h, hide) => h.map((c, i) => hide && i === 1 ? '🂠' : cardName(c.r) + c.s).join(' ');
+const drawCard = () => ({ r: rand(1, 13), s: SU[rand(0, 3)] });
+
+const chipVals = () => [1, 5, 25, 100].map(m => CAS_BASE[S.stage] * m);
+const curBet = () => chipVals()[Math.min(S.chip, 3)];
+const locked = () => S.azart >= 100;
+
+function settle(bet, ret, text, sub) {
+  // bet уже списана; ret = сколько вернулось
+  S.cash.RUB += ret; S.stats.casinoNet += ret - bet;
+  S.cas.last = text; S.cas.sub = sub || (ret > bet ? '+' + mny(ret - bet) : ret === bet ? 'Ставка возвращена' : '-' + mny(bet - ret));
+  if (ret > bet) note('success');
+  S.azart = Math.min(100, S.azart + 3);
+  if (S.azart >= 70) moodUp(-2);
+  if (S.azart >= 100) { moodUp(-15); say('🎰 Азарт зашкаливает. Нужно остановиться, ставки заблокированы до завтра.', 'bad'); }
+}
+function startRound() {
+  const bet = curBet();
+  if (locked()) { toast('Слишком сильный азарт. Приходи завтра.'); return null; }
+  if (rub() < bet) { toast('Не хватает денег на ставку'); return null; }
+  if (!tick(0.5, 'home')) return null;
+  S.cash.RUB -= bet; return bet;
+}
+function playCoin(side) {
+  const bet = startRound(); if (!bet) return;
+  const r = Math.random() < 0.5 ? 'орёл' : 'решка';
+  settle(bet, r === side ? bet * 1.9 : 0, r === 'орёл' ? '🦅' : '🪙', 'Выпал ' + r);
+}
+function playSlots() {
+  const bet = startRound(); if (!bet) return;
+  const tot = SLOT.reduce((a, x) => a + x.w, 0), pick = () => { let r = Math.random() * tot; for (const x of SLOT) { r -= x.w; if (r <= 0) return x; } return SLOT[0]; };
+  const r = [pick(), pick(), pick()]; let mult = 0;
+  if (r[0].s === r[1].s && r[1].s === r[2].s) mult = r[0].p;
+  else if (r.filter(x => x.s === '🍒').length === 2) mult = 0.2;
+  settle(bet, bet * mult, r.map(x => x.s).join(' '), mult >= 1 ? 'Выигрыш ×' + mult + '!' : mult > 0 ? 'Две вишни: возврат 20%' : '');
+}
+function playDice(kind) {
+  const bet = startRound(); if (!bet) return;
+  const a = rand(1, 6), b = rand(1, 6), s = a + b; let mult = 0;
+  if (kind === 'over' && s > 7) mult = 2.2; if (kind === 'under' && s < 7) mult = 2.2; if (kind === 'seven' && s === 7) mult = 5.5;
+  settle(bet, bet * mult, '🎲 ' + a + ' + ' + b + ' = ' + s, '');
+}
+function playRoulette(kind, num) {
+  const bet = startRound(); if (!bet) return;
+  const n = rand(0, 36), red = RED.includes(n); let mult = 0;
+  if (kind === 'red' && red) mult = 2; if (kind === 'black' && n > 0 && !red) mult = 2;
+  if (kind === 'even' && n > 0 && n % 2 === 0) mult = 2; if (kind === 'odd' && n % 2 === 1) mult = 2;
+  if (kind === 'num' && n === num) mult = 36;
+  settle(bet, bet * mult, '🎡 ' + n + (n === 0 ? ' зеро' : red ? ' красное' : ' чёрное'), '');
+}
+/* блэкджек */
+function bjDeal() {
+  const bet = startRound(); if (!bet) return;
+  const bj = { bet, p: [drawCard(), drawCard()], d: [drawCard(), drawCard()], done: false, doubled: false };
+  S.cas.bj = bj;
+  if (handVal(bj.p) === 21) bjFinish();
+}
+function bjFinish() {
+  const bj = S.cas.bj; bj.done = true;
+  const pv = handVal(bj.p);
+  while (handVal(bj.d) < 17 && pv <= 21) bj.d.push(drawCard());
+  const dv = handVal(bj.d), stake = bj.bet * (bj.doubled ? 2 : 1);
+  const pBJ = bj.p.length === 2 && pv === 21, dBJ = bj.d.length === 2 && dv === 21;
+  let ret = 0, sub;
+  if (pv > 21) { ret = 0; sub = 'Перебор'; }
+  else if (pBJ && !dBJ) { ret = bj.bet * 2.5; sub = 'Блэкджек 3:2!'; }
+  else if (dv > 21 || pv > dv) { ret = stake * 2; sub = 'Победа'; }
+  else if (pv === dv) { ret = stake; sub = 'Ничья'; }
+  else { ret = 0; sub = 'Дилер выиграл'; }
+  bj.text = 'Ты: ' + showHand(bj.p) + ' (' + pv + ')<br>Дилер: ' + showHand(bj.d) + ' (' + dv + ')';
+  settle(stake, ret, '🃏', sub);
+}
+function bjHit() { const bj = S.cas.bj; bj.p.push(drawCard()); if (handVal(bj.p) >= 21) bjFinish(); }
+function bjDouble() { const bj = S.cas.bj; if (!pay2(bj.bet)) return; bj.doubled = true; bj.p.push(drawCard()); bjFinish(); }
+
+const GAMES = [['slots', '🎰', 'Слоты'], ['roulette', '🎡', 'Рулетка'], ['bj', '🃏', 'Блэкджек'], ['dice', '🎲', 'Кости'], ['coin', '🪙', 'Монетка']];
+function casinoView() {
+  const bet = curBet();
+  let h = box('<b>🎰 ' + CAS_NAME(S.stage) + '</b><div class="muted">Шанс всегда чуть против тебя. Азарт: <b class="' + (S.azart >= 70 ? 'dn' : '') + '">' + Math.round(S.azart) + '/100</b> · итог за всё время: <span class="' + (S.stats.casinoNet >= 0 ? 'up' : 'dn') + '">' + mny(S.stats.casinoNet) + '</span></div>');
+  h += '<div class="chips">' + GAMES.map(g => mini(g[1] + ' ' + g[2], () => { S.game = g[0]; }, true, S.game === g[0] ? 'on' : '')).join('') + '</div>';
+  h += '<div class="chips"><span class="muted" style="align-self:center">Ставка:</span>' + chipVals().map((v, i) => mini(fmt(v), () => { S.chip = i; }, true, S.chip === i ? 'on' : '')).join('') + '</div>';
+  const bj = S.cas.bj;
+  let body = '<div class="res">' + (S.cas.last || '🎲') + '</div><div class="sub">' + (S.cas.sub || '') + '</div>';
+  if (S.game === 'bj' && bj) body += '<div style="margin-top:6px;font-size:14px">' + (bj.done ? bj.text : 'Ты: ' + showHand(bj.p) + ' (' + handVal(bj.p) + ')<br>Дилер: ' + showHand(bj.d, true)) + '</div>';
+  h += '<div class="cas">' + body + '</div>';
+  const lk = locked(), can = rub() >= bet && !lk, why = lk ? 'Азарт зашкаливает' : 'Нужно ' + mny(bet);
+  const A = [];
+  if (S.game === 'slots') A.push(B('🎰', 'Крутить', 'ставка ' + mny(bet), playSlots, can, why, 'big'));
+  if (S.game === 'coin') { A.push(B('🦅', 'Орёл', '×1,9', () => playCoin('орёл'), can, why)); A.push(B('🪙', 'Решка', '×1,9', () => playCoin('решка'), can, why)); }
+  if (S.game === 'dice') { A.push(B('⬆️', 'Больше 7', '×2,2', () => playDice('over'), can, why)); A.push(B('⬇️', 'Меньше 7', '×2,2', () => playDice('under'), can, why)); A.push(B('7️⃣', 'Ровно 7', '×5,5', () => playDice('seven'), can, why, 'big')); }
+  if (S.game === 'roulette') {
+    A.push(B('🔴', 'Красное', '×2', () => playRoulette('red'), can, why)); A.push(B('⚫', 'Чёрное', '×2', () => playRoulette('black'), can, why));
+    A.push(B('2️⃣', 'Чётное', '×2', () => playRoulette('even'), can, why)); A.push(B('1️⃣', 'Нечётное', '×2', () => playRoulette('odd'), can, why));
+    A.push(B('🎯', 'Число ' + (S.cas.num || 17), '×36', () => playRoulette('num', S.cas.num || 17), can, why, 'big'));
+  }
+  if (S.game === 'bj') {
+    if (!bj || bj.done) A.push(B('🃏', 'Раздать карты', 'ставка ' + mny(bet), bjDeal, can, why, 'big'));
+    else {
+      A.push(B('➕', 'Ещё', '', bjHit)); A.push(B('✋', 'Хватит', '', bjFinish));
+      A.push(B('✖️2', 'Удвоить', mny(bj.bet), bjDouble, bj.p.length === 2 && rub() >= bj.bet, 'Нет денег', 'big'));
+    }
+  }
+  h += grid(A);
+  if (S.game === 'roulette') h += '<div class="chips"><span class="muted" style="align-self:center">Своё число (0-36):</span><input id="rnum" type="number" min="0" max="36" value="' + (S.cas.num || 17) + '"></div>';
+  return h;
+}
+document.addEventListener('input', e => { if (e.target && e.target.id === 'rnum') S.cas.num = clamp(parseInt(e.target.value) || 0, 0, 36); });
+TABS.casino = { ic: '🎰', n: 'Казино', from: 2, to: 10, view: casinoView };
+
+/* --- 07_biz.js --- */
+/* ============ ЭТАПЫ 6-8: БИЗНЕС, ИНВЕСТОР, МАГНАТ ============ */
+function bizTotal() { return S.biz.units.reduce((a, l) => a + BIZ[l].cost, 0); }
+function bizMult() {
+  const b = S.biz, sat = 1 / (1 + bizTotal() / 3e9);
+  return SUPS[b.sup].m * (1 + b.brand / 200) * sat * (b.crisis > 0 ? 0.6 : 1) * (b.mgr ? 1 : Math.max(0.4, 1 - 0.1 * b.neglect));
+}
+const bizGross = () => bizTotal() * 0.08 * bizMult();
+const bizNet = () => bizGross() * (b => b.mgr ? 0.7 : 0.85)(S.biz);
+
+DAILY.push(() => {
+  const b = S.biz; if (S.stage < 6 || !b.units.length) return;
+  let profit = bizGross();
+  if (b.sup === 0 && Math.random() < 0.1) { profit *= 0.7; say('Дешёвое сырьё испортилось: прибыль упала.', 'bad'); }
+  const net = profit * (b.mgr ? 0.7 : 0.85);
+  earn(net); b.month += net;
+  b.brand = clamp(b.brand - 1 + (b.sup === 2 ? 0.5 : 0)); b.neglect++; if (b.crisis > 0) b.crisis--;
+  if (S.day % 30 === 0) {
+    const tax = b.month * 0.13; b.month = 0;
+    if (!payBill(tax, 'налоги')) { /* долг записан */ }
+    say('🧾 Налоги за месяц: ' + mny(tax) + '.');
+  }
+  const r = Math.random();
+  if (r < 0.03) { const f = Math.min(rub(), net * 3); S.cash.RUB -= f; say('🔍 Налоговая проверка: штраф ' + mny(f) + '.', 'bad'); }
+  else if (r < 0.06) { b.crisis = 5; say('📉 Кризис поставок: прибыль -40% на 5 дней.', 'bad'); }
+  else if (r < 0.09) { b.brand = clamp(b.brand + 20); say('📱 Вирусный пост: бренд вырос!', 'good'); }
+});
+// банкротство
+DAILY.push(() => {
+  if (S.stage < 6 || S.stage >= 10) return;
+  if (S.debt > 1e6 && S.debt > 0.7 * assetsRub()) {
+    S.biz = { units: [], brand: 0, sup: 1, mgr: false, neglect: 0, crisis: 0, month: 0 };
+    S.cash = { RUB: 0, USD: 0, EUR: 0, CNY: 0 }; S.deposit = 0; S.debt = 0; S.corps = []; S.estate.n = 0;
+    for (const k in S.stk) S.stk[k].q = 0;
+    S.housing = 1; S.transport = Math.min(S.transport, 3); S.job = true; S.jobLvl = 1; S.jobXp = Math.max(S.jobXp, CAREER_XP[1]);
+    fall(4, 'Банкротство! Кредиторы забрали бизнес и активы. Ты снова специалист.');
+  }
+});
+
+function bizView() {
+  const b = S.biz;
+  let h = box('<b>🏭 Твой бизнес</b><div class="muted">Точек: ' + b.units.length + ' · стоимость ' + mny(bizTotal()) + '<br>Прибыль: ~' + mny(bizNet()) + '/день · бренд ' + Math.round(b.brand) + '% · ' + (b.mgr ? '👔 есть управляющий' : 'без присмотра: ' + b.neglect + ' дн.') + (b.crisis > 0 ? '<br>⚠️ Кризис поставок: ещё ' + b.crisis + ' дн.' : '') + '<br>Рынок насыщается: чем больше бизнес, тем ниже отдача.</div>');
+  const cnt = [0, 0, 0, 0]; b.units.forEach(l => cnt[l]++);
+  h += '<div class="chips">' + BIZ.map((x, i) => '<span class="chip">' + x.ic + ' ' + x.n + ': ' + cnt[i] + '</span>').join('') + '</div>';
+  const low = b.units.length ? Math.min(...b.units) : 0;
+  const adv = Math.max(100000, bizGross() * 3), mgrCost = Math.max(500000, bizGross() * 10);
+  h += grid([
+    B('🛠️', 'Управлять', '2 ч, сбросить запущенность', () => { if (!tick(2, 'out')) return; b.neglect = 0; b.brand = clamp(b.brand + 3); S.did.biz = 1; say('Объехал точки, навёл порядок.', 'good'); }, !S.did.biz, 'Сегодня уже'),
+    B('📣', 'Реклама', mny(adv) + ', бренд +15', () => { if (!pay2(adv)) return; b.brand = clamp(b.brand + 15); say('📣 Рекламная кампания запущена.', 'good'); }, rub() >= adv, 'Нужно ' + mny(adv)),
+    B('👔', b.mgr ? 'Управляющий нанят' : 'Нанять управляющего', b.mgr ? '' : mny(mgrCost) + ', 15% прибыли', () => { if (!pay2(mgrCost)) return; b.mgr = true; say('👔 Управляющий взял бизнес на себя.', 'good'); }, !b.mgr && rub() >= mgrCost, b.mgr ? 'Уже есть' : 'Нужно ' + mny(mgrCost)),
+    B('⬆️', 'Расширить точку', b.units.length && low < 3 ? BIZ[low].n + ' → ' + BIZ[low + 1].n + ', ' + mny(BIZ[low + 1].cost - BIZ[low].cost * 0.5) : '', () => { const c = BIZ[low + 1].cost - BIZ[low].cost * 0.5; if (!pay2(c)) return; b.units[b.units.indexOf(low)]++; say('⬆️ Точка расширена.', 'good'); note('success'); }, b.units.length > 0 && low < 3 && rub() >= BIZ[low + 1].cost - BIZ[low].cost * 0.5, 'Не хватает денег')
+  ]);
+  h += sec('Открыть новую точку');
+  h += grid(BIZ.map((x, i) => B(x.ic, x.n, mny(x.cost), () => { if (!pay2(x.cost)) return; b.units.push(i); say(x.ic + ' Открыл: ' + x.n + '.', 'good'); note('success'); }, rub() >= x.cost, 'Нужно ' + mny(x.cost))));
+  h += sec('Поставщик');
+  h += '<div class="chips">' + SUPS.map((s, i) => mini(s.n, () => { b.sup = i; say('Поставщик: ' + s.n + '.'); }, true, b.sup === i ? 'on' : '')).join('') + '</div><div class="muted">' + SUPS[b.sup].d + '</div>';
+  h += grid([B('⏩', 'Ждать неделю', '7 дней', () => waitDays(7), true, '', 'big')]);
+  return h;
+}
+TABS.biz = { ic: '🏪', n: 'Бизнес', from: 6, to: 10, view: bizView };
+
+/* ---------- ЭТАП 8: КОРПОРАЦИИ И РЕПУТАЦИЯ ---------- */
+DAILY.push(() => {
+  if (S.stage < 8 || S.stage > 10) return;
+  for (const id of S.corps) {
+    const c = CORPS.find(x => x.id === id);
+    earn(c.price * c.y * (S.scandal > 0 ? 0.5 : 1));
+    S.rep = clamp(S.rep + c.rep);
+  }
+  if (S.scandal > 0) S.scandal--;
+  if (S.corps.length && Math.random() < 0.04) { S.rep = clamp(S.rep - 15); S.scandal = 7; say('📰 Громкий скандал! Репутация -15, доход корпораций вдвое меньше на неделю.', 'bad'); }
+  else if (Math.random() < 0.03) { S.rep = clamp(S.rep + 6); say('🌟 СМИ хвалят твой вклад. Репутация выросла.', 'good'); }
+});
+function empireView() {
+  const nw = netWorth();
+  let h = box('<b>🏛️ Империя</b><div class="muted">Репутация: <b>' + Math.round(S.rep) + '/100</b>' + (S.scandal > 0 ? ' · 🔥 скандал ещё ' + S.scandal + ' дн.' : '') + '<br>Корпораций: ' + S.corps.length + ' · доход ~' + mny(S.corps.reduce((a, id) => { const c = CORPS.find(x => x.id === id); return a + c.price * c.y; }, 0)) + '/день</div>');
+  const charity = Math.max(5e6, nw * 0.005), pr = Math.max(2e6, nw * 0.01);
+  h += grid([
+    B('🎤', 'Пресс-конференция', '2 ч, репутация +2', () => { if (!tick(2, 'out')) return; S.rep = clamp(S.rep + 2 + (S.corps.includes('media') ? 1 : 0)); S.did.press = 1; say('🎤 Пресс-конференция прошла хорошо.', 'good'); }, !S.did.press, 'Сегодня уже'),
+    B('❤️', 'Благотворительность', mny(charity) + ', репутация +' + Math.round(10 * (1 - S.rep / 120)), () => { if (!pay2(charity)) return; S.rep = clamp(S.rep + 10 * (1 - S.rep / 120)); say('❤️ Пожертвование принято. Репутация растёт.', 'good'); note('success'); }, rub() >= charity, 'Нужно ' + mny(charity)),
+    B('🧯', 'Антикризисный PR', mny(pr) + ', снять скандал', () => { if (!pay2(pr)) return; S.scandal = 0; S.rep = clamp(S.rep + 5); say('🧯 Кризис потушен.', 'good'); }, S.scandal > 0 && rub() >= pr, S.scandal > 0 ? 'Нужно ' + mny(pr) : 'Скандалов нет'),
+    B('⏩', 'Ждать неделю', '7 дней', () => waitDays(7))
+  ]);
+  h += sec('Корпорации');
+  h += CORPS.map(c => {
+    const own = S.corps.includes(c.id);
+    return '<div class="item"><span class="ic">' + c.ic + '</span><div class="tx">' + c.n + '<small>' + c.note + ' · доход ' + (c.y * 100).toFixed(1) + '%/день' + (c.rep ? ', репутация ' + (c.rep > 0 ? '+' : '') + c.rep + '/день' : '') + '</small></div>' +
+      mini(own ? 'Твоя' : mny(c.price), () => { if (!pay2(c.price)) return; S.corps.push(c.id); say(c.ic + ' Купил: ' + c.n + '.', 'good'); note('success'); }, !own && rub() >= c.price) + '</div>';
+  }).join('');
+  return h;
+}
+TABS.empire = { ic: '🏛️', n: 'Империя', from: 8, to: 10, view: empireView };
+
+/* ---------- ЦЕЛИ ЭТАПОВ 6-8 ---------- */
+GOALS[6] = () => ({
+  items: [{ t: 'Капитал', cur: netWorth(), need: 15e6, money: 1 }],
+  btn: '📈 Стать инвестором', can: netWorth() >= 15e6, go() { setStage(7); }
+});
+GOALS[7] = () => ({
+  items: [{ t: 'Капитал', cur: netWorth(), need: 150e6, money: 1 }],
+  btn: '🏛️ Стать магнатом', can: netWorth() >= 150e6, go() { setStage(8); }
+});
+GOALS[8] = () => ({
+  items: [{ t: 'Капитал', cur: netWorth(), need: 1.5e9, money: 1 }, { t: 'Репутация', cur: Math.round(S.rep), need: 60 }],
+  btn: '🗳️ Уйти в политику', can: netWorth() >= 1.5e9 && S.rep >= 60,
+  go() { S.pol = { lvl: 0, appr: 50, next: S.day + 20, camp: 0 }; setStage(9); }
+});
+
+/* --- 08_politics.js --- */
+/* ============ ЭТАПЫ 9-10: ПОЛИТИКА И ГОСУДАРСТВО ============ */
+const POL_STEPS = [
+  { n: 'Выборы в горсовет', title: 'Кандидат', thr: 50, gap: 20 },
+  { n: 'Выборы в парламент региона', title: 'Депутат горсовета', thr: 55, gap: 20 },
+  { n: 'Президентские выборы Республики Аркадия', title: 'Депутат региона', thr: 60, gap: 25 }
+];
+DAILY.push(() => {
+  if (S.stage !== 9) return;
+  const p = S.pol;
+  p.appr = clamp(p.appr - 0.8);
+  const r = Math.random();
+  if (r < 0.07) { p.appr = clamp(p.appr - 6); say('📰 Журналисты раскопали старую историю. Рейтинг -6.', 'bad'); }
+  else if (r < 0.14) { p.appr = clamp(p.appr + 5); say('📰 Твоя инициатива понравилась людям. Рейтинг +5.', 'good'); }
+  if (S.day >= p.next) holdElection();
+});
+function holdElection() {
+  const p = S.pol, st = POL_STEPS[p.lvl];
+  const score = p.appr + rand(-8, 8);
+  if (score >= st.thr) {
+    p.lvl++; note('success');
+    if (p.lvl >= 3) { enterState(); return; }
+    p.next = S.day + POL_STEPS[p.lvl].gap;
+    say('🗳️ Победа на выборах! Теперь: ' + POL_STEPS[p.lvl].title + '.', 'good');
+    M.fn = () => '<h2>🗳️ Победа!</h2><p>' + st.n + ' выиграны. Рейтинг: ' + Math.round(p.appr) + '%.</p><button class="btn" data-close="1">Дальше</button>';
+  } else {
+    S.rep = clamp(S.rep - 10); p.appr = Math.max(p.appr, 45); p.next = S.day + 10;
+    say('🗳️ Поражение на выборах (' + Math.round(score) + '% при проходном ' + st.thr + '%). Новая попытка через 10 дней.', 'bad'); note('error');
+    M.fn = () => '<h2>🗳️ Поражение</h2><p>Нужно было ' + st.thr + '%, а получилось ' + Math.round(score) + '%. Репутация -10. Следующая попытка через 10 дней.</p><button class="btn" data-close="1">Понял</button>';
+  }
+}
+function polView() {
+  const p = S.pol, st = POL_STEPS[Math.min(2, p.lvl)], nw = netWorth();
+  const ad = Math.max(1e6, nw * 0.002);
+  let h = box('<b>🗳️ ' + st.title + '</b><div class="muted">Следующее: ' + st.n + ' через ' + Math.max(0, p.next - S.day) + ' дн. · нужно ≥' + st.thr + '%<br>Рейтинг одобрения: <b>' + Math.round(p.appr) + '%</b> · репутация ' + Math.round(S.rep) + '</div>');
+  h += grid([
+    B('📢', 'Митинг', '3 ч, рейтинг +4..7', () => { if (!tick(3, 'out')) return; p.appr = clamp(p.appr + rand(4, 7)); moodUp(-4); S.did.rally = 1; say('📢 Митинг собрал толпу.', 'good'); }, !S.did.rally && S.energy >= 20, S.did.rally ? 'Сегодня уже' : 'Нет сил'),
+    B('🎙️', 'Дебаты', '2 ч, риск', () => {
+      if (!tick(2, 'out')) return; S.did.debate = 1;
+      if (Math.random() < 0.5 + 0.2 * (S.rep - 50) / 50) { p.appr = clamp(p.appr + 8); say('🎙️ Блестящие дебаты! +8%.', 'good'); } else { p.appr = clamp(p.appr - 3); say('🎙️ Дебаты прошли неудачно. -3%.', 'bad'); }
+    }, !S.did.debate, 'Сегодня уже'),
+    B('📺', 'Реклама', mny(ad) + ', +6%', () => { if (!pay2(ad)) return; p.appr = clamp(p.appr + 6); S.did.ad = 1; say('📺 Рекламная кампания в эфире.', 'good'); }, !S.did.ad && rub() >= ad, S.did.ad ? 'Сегодня уже' : 'Нужно ' + mny(ad)),
+    B('🎭', 'Благотворительный вечер', mny(ad) + ', +4% и репутация', () => { if (!pay2(ad)) return; p.appr = clamp(p.appr + 4); S.rep = clamp(S.rep + 5); S.did.gala = 1; say('🎭 Вечер удался.', 'good'); }, !S.did.gala && rub() >= ad, S.did.gala ? 'Сегодня уже' : 'Нужно ' + mny(ad)),
+    B('🗂️', 'Компромат на соперника', 'риск 40%', () => {
+      S.did.dirt = 1;
+      if (Math.random() < 0.6) { p.appr = clamp(p.appr + 10); say('🗂️ Скандал у соперника. Тебе +10%.', 'good'); } else { p.appr = clamp(p.appr - 10); S.rep = clamp(S.rep - 15); say('🗂️ Компромат слили против тебя. -10% и репутация -15.', 'bad'); }
+    }, !S.did.dirt, 'Сегодня уже'),
+    B('⏩', 'Ждать неделю', '7 дней', () => waitDays(7))
+  ]);
+  return h;
+}
+TABS.politics = { ic: '🗳️', n: 'Политика', from: 9, to: 9, view: polView };
+
+GOALS[9] = () => ({
+  items: [
+    { t: POL_STEPS[Math.min(2, S.pol.lvl)].n, v: 'через ' + Math.max(0, S.pol.next - S.day) + ' дн.' },
+    { t: 'Рейтинг одобрения', cur: Math.round(S.pol.appr), need: POL_STEPS[Math.min(2, S.pol.lvl)].thr }
+  ]
+});
+
+/* ---------- ГЛАВА ГОСУДАРСТВА ---------- */
+function enterState() {
+  S.st = { treasure: 50, people: 50, army: 50, science: 50, space: S.corps.includes('space') ? 10 : 0, card: null };
+  S.housing = 7;
+  setStage(10);
+}
+const BARS = { treasure: ['🏦', 'Казна'], people: ['👥', 'Народ'], army: ['🛡️', 'Армия'], science: ['🔬', 'Наука'] };
+function fxHint(fx) {
+  return Object.keys(fx).map(k => BARS[k][0] + (fx[k] > 0 ? (fx[k] >= 10 ? '⬆️' : '↑') : (fx[k] <= -10 ? '⬇️' : '↓'))).join(' ');
+}
+function stateChoose(side) {
+  const c = CARDS[S.st.card], ch = c[side], fx = ch[1], sp = ch[2] || 0;
+  for (const k in fx) S.st[k] = clamp(S.st[k] + fx[k]);
+  S.st.space = clamp(S.st.space + sp, 0, 100);
+  S.st.space = clamp(S.st.space + (0.35 + Math.max(0, (S.st.science - 40) / 22)) * (S.corps.includes('space') ? 1.3 : 1), 0, 100);
+  S.st.card = null; S.hour = 8; newDay();
+  say(c.who + ' ' + ch[0] + '.');
+  const dead = Object.keys(BARS).find(k => S.st[k] <= 0);
+  if (dead) {
+    S.rep = clamp(S.rep - 20); S.cash.RUB = Math.round(S.cash.RUB / 2); S.housing = 6;
+    S.st = { treasure: 50, people: 50, army: 50, science: 50, space: 0, card: null };
+    fall(8, 'Отставка: шкала «' + BARS[dead][1] + '» упала до нуля. Ты потерял власть и половину наличных.');
+    return;
+  }
+  if (S.st.space >= 100) { S.over = { type: 'win' }; note('success'); finishRun(); }
+}
+function stateView() {
+  if (S.st.card == null) S.st.card = rand(0, CARDS.length - 1);
+  const c = CARDS[S.st.card];
+  let h = box('<b>🚀 Космическая программа: ' + Math.floor(S.st.space) + '%</b><div class="muted">Наука и решения двигают проект. Любая шкала на нуле означает отставку.</div>');
+  h += '<div class="reign"><div class="who">' + c.who + '</div><div class="tx">' + c.t + '</div></div>';
+  h += grid([
+    B('◀️', c.L[0], fxHint(c.L[1]), () => stateChoose('L')),
+    B('▶️', c.R[0], fxHint(c.R[1]), () => stateChoose('R'))
+  ]);
+  return h;
+}
+TABS.state = { ic: '👑', n: 'Госдело', from: 10, to: 10, view: stateView };
+GOALS[10] = () => ({ items: [{ t: 'Космическая программа', cur: Math.floor(S.st.space), need: 100 }] });
+
+/* --- 09_rating.js --- */
+/* ===================== РЕЙТИНГ ===================== */
+const R = { top: null, loading: false, err: '', sent: 0 };
+function userName() {
+  const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  return u ? (u.first_name || u.username || 'Игрок') : 'Игрок';
+}
+async function submitScore(force) {
+  if (!API_URL || !tg || !tg.initData || !S) return;
+  const now = Date.now();
+  if (!force && now - R.sent < 15000) return;
+  R.sent = now;
+  try {
+    await fetch(API_URL + '/submit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: tg.initData, score: calcScore(), stage: S.stage, days: S.day, net: Math.round(netWorth()) })
+    });
+  } catch (e) {}
+}
+async function fetchTop() {
+  if (!API_URL) return;
+  R.loading = true; R.err = ''; render();
+  try { const r = await fetch(API_URL + '/top'); R.top = await r.json(); }
+  catch (e) { R.err = 'Не удалось загрузить рейтинг'; }
+  R.loading = false; render();
+}
+function ratingView() {
+  const sc = calcScore();
+  let h = box('<b>🏆 Твой результат</b><div class="muted">Очки: <b style="color:var(--gold)">' + fmt(sc) + '</b> · этап ' + S.stage + ' (' + STAGES[S.stage].n + ') · день ' + S.day + '<br>Капитал: ' + mny(netWorth()) + '<br>Лучший забег: ' + (META.best ? fmt(META.best.score) + ' очков, этап ' + META.best.stage + ', день ' + META.best.day : 'ещё нет') + ' · забегов: ' + META.runs + ' · побед: ' + META.wins + '</div>');
+  h += '<div class="muted" style="margin-bottom:6px">Очки = этап × 10 000 + логарифм капитала − дни. Чем быстрее поднимаешься, тем выше.</div>';
+  h += grid([
+    B('📤', 'Отправить результат', API_URL ? 'в общий рейтинг' : 'рейтинг не подключён', () => { submitScore(true).then(fetchTop); toast('Отправлено'); }, !!API_URL && !!(tg && tg.initData), 'Нужен сервер рейтинга и запуск из Telegram'),
+    B('🔄', 'Обновить таблицу', '', fetchTop, !!API_URL, 'Нужен сервер рейтинга')
+  ]);
+  if (!API_URL) h += box('Общий рейтинг включится, когда подключишь сервер (папка <b>server</b>, инструкция в README). Пока работает личный рекорд.');
+  else if (R.loading) h += box('Загружаю...');
+  else if (R.err) h += box(R.err);
+  else if (R.top) {
+    h += sec('Топ игроков');
+    h += R.top.map((r, i) => '<div class="row2"><div class="nm"><b>' + (i + 1) + '. ' + String(r.name || 'Игрок').replace(/[<>&]/g, '') + '</b><small>' + (STAGES[r.stage] ? STAGES[r.stage].ic + ' ' + STAGES[r.stage].n : '') + ', день ' + r.days + '</small></div><b style="color:var(--gold)">' + fmt(r.score) + '</b></div>').join('') || box('Пока никого.');
+  }
+  return h;
+}
+TABS.rating = { ic: '🏆', n: 'Рейтинг', from: 1, to: 10, view: ratingView };
+
+/* --- 10_main.js --- */
+/* ===================== ОТРИСОВКА И ЗАПУСК ===================== */
+function act(fn) {
+  if (!S || S.over || !S.intro) return;
+  try { fn(); } catch (e) { console.error(e); toast('Ошибка: ' + e.message); }
+  if (S.hp <= 0 && !S.over) collapse();
+  save(); render();
+}
+function goTab(id) {
+  if (!S || S.over) return;
+  if (S.stage === 1 && STREET.includes(id) && id !== S.loc) {
+    act(() => { if (!tick(1, 'out')) return; S.loc = id; S.tab = id; say('Дошёл: ' + LOCS[id].n + '.'); maybeEvent(0.15); });
+    return;
+  }
+  S.tab = id; if (S.stage === 1 && STREET.includes(id)) S.loc = id;
+  save(); render();
+}
+function statsHTML() {
+  let bars;
+  if (S.stage >= 10) bars = Object.keys(BARS).map(k => ({ v: S.st[k], ic: BARS[k][0], n: BARS[k][1], c: { treasure: '#f59e0b', people: '#38bdf8', army: '#ef4444', science: '#a3e635' }[k] }));
+  else {
+    bars = [
+      { v: S.hp, ic: '❤️', n: 'Здоровье', c: '#ef4444' },
+      { v: S.food, ic: '🍞', n: 'Сытость', c: '#f59e0b' },
+      S.stage === 1 ? { v: S.warm, ic: '🔥', n: 'Тепло', c: '#38bdf8' } : { v: S.mood, ic: '🙂', n: 'Настроение', c: '#c084fc' },
+      { v: S.energy, ic: '⚡', n: 'Бодрость', c: '#a3e635' }
+    ];
+  }
+  return bars.map(b => { const v = Math.round(b.v); return '<div class="stat' + (v < 25 ? ' low' : '') + '"><div class="row"><span>' + b.ic + ' ' + b.n + '</span><b>' + v + '</b></div><div class="bar"><i style="width:' + v + '%;background:' + b.c + '"></i></div></div>'; }).join('');
+}
+function goalHTML() {
+  const gf = GOALS[S.stage]; if (!gf) return '';
+  const g = gf();
+  let h = '<div class="goalbox"><div class="gt">Цель этапа</div>';
+  for (const it of g.items) {
+    if (it.cur !== undefined) {
+      const pct = Math.min(100, it.cur / it.need * 100);
+      h += '<div class="gi ' + (pct >= 100 ? 'done' : '') + '"><span>' + (pct >= 100 ? '✓' : '○') + ' ' + it.t + '</span><div class="pb"><i style="width:' + pct + '%"></i></div><span class="v">' + (it.money ? fmt(it.cur) + ' / ' + fmt(it.need) + ' ₽' : Math.floor(it.cur) + ' / ' + it.need) + '</span></div>';
+    } else h += '<div class="gi ' + (it.done ? 'done' : '') + '"><span>' + (it.done ? '✓' : '○') + ' ' + it.t + '</span><span class="v">' + (it.v || '') + '</span></div>';
+  }
+  if (g.btn && g.can) h += '<div class="acts" style="margin:8px 0 0">' + B('⭐', g.btn, 'Условия выполнены', () => g.go(), true, '', 'win big') + '</div>';
+  return h + '</div>';
+}
+function walletModal() {
+  let h = '<h2>💰 Кошелёк</h2><div class="item"><span class="ic">₽</span><div class="tx">Рубли<small>' + mny(S.cash.RUB) + '</small></div></div>';
+  for (const c of ['USD', 'EUR', 'CNY']) if (S.cash[c] > 0 || S.stage >= 4) h += '<div class="item"><span class="ic">' + SYM[c] + '</span><div class="tx">' + CUR_NAMES[c] + '<small>' + S.cash[c].toFixed(0) + ' ' + SYM[c] + ' = ' + mny(S.cash[c] * S.fx.r[c]) + '</small></div></div>';
+  if (S.deposit > 0) h += '<div class="item"><span class="ic">🏦</span><div class="tx">Вклад<small>' + mny(S.deposit) + '</small></div></div>';
+  if (S.debt > 0) h += '<div class="item"><span class="ic">⚠️</span><div class="tx">Долг<small>' + mny(S.debt) + '</small></div></div>';
+  h += '<p>Капитал: <b>' + mny(netWorth()) + '</b><br>Очки рейтинга: <b>' + fmt(calcScore()) + '</b></p>';
+  h += '<button class="btn" data-close="1">Закрыть</button><button class="btn alt" id="resetBtn">Начать игру заново</button>';
+  return h;
+}
+function render() {
+  if (!S) return;
+  CUR = [];
+  const st = STAGES[S.stage];
+  $('#stage').textContent = st.ic + ' ' + st.n;
+  $('#clock').textContent = 'День ' + S.day + ' · ' + pad(Math.floor(S.hour)) + ':' + (S.hour % 1 ? '30' : '00');
+  $('#wallet').textContent = '💰 ' + fmt(rub()) + ' ₽';
+  $('#stats').innerHTML = statsHTML();
+  $('#goal').innerHTML = goalHTML();
+  const lg = $('#log');
+  lg.innerHTML = S.log.slice(-6).map(l => '<div class="' + l.cls + '">' + l.t + '</div>').join('') || '<div>Новый день...</div>';
+  lg.scrollTop = lg.scrollHeight;
+  const tabs = tabsNow();
+  if (!tabs.includes(S.tab)) S.tab = tabs[0];
+  $('#view').innerHTML = TABS[S.tab].view();
+  $('#nav').innerHTML = tabs.map(id => '<button data-tab="' + id + '" class="' + (id === S.tab ? 'on' : '') + '"><span>' + TABS[id].ic + '</span><small>' + TABS[id].n + '</small></button>').join('');
+  const nb = $('#nav button.on'); if (nb && nb.scrollIntoView) T(() => nb.scrollIntoView({ block: 'nearest', inline: 'center' }));
+  const md = $('#modal');
+  if (M.fn) { $('#modalBody').innerHTML = M.fn(); md.classList.add('show'); } else md.classList.remove('show');
+  renderOver();
+}
+const EPI = ['Зима не прощает ошибок.', 'Улица жестока, но справедлива.', 'Даже у дна есть дно.', 'Весна пришла без тебя.'];
+function renderOver() {
+  const o = $('#over');
+  if (!S.intro) {
+    o.innerHTML = '<div class="sheet"><h2>🧥 Бомжара: путь наверх</h2><p>Начинаешь с улицы. Нужно восстановить паспорт, снять комнату и пойти вверх по лестнице жизни.</p><p>Десять этапов: от «Без адреса» до главы государства и космоса. По пути школа, вуз, карьера, бизнес, биржа, выборы, обменник с плавающим курсом и казино.</p><p>Следи за здоровьем, сытостью, теплом (позже настроением) и бодростью. Падать вниз можно, и это не конец.</p><button class="btn" id="startBtn">Начать</button></div>';
+    o.classList.add('show'); return;
+  }
+  if (!S.over) { o.classList.remove('show'); return; }
+  const w = S.over.type === 'win';
+  o.innerHTML = '<div class="sheet"><h2>' + (w ? '🚀 Ракета ушла в космос!' : '💀 Ты ' + S.over.why) + '</h2><p>' +
+    (w ? 'От ночлежки до космодрома. Страна запомнит тебя.' : EPI[S.day % EPI.length]) +
+    '</p><p>Дней: <b>' + S.day + '</b><br>Очки: <b>' + fmt(calcScore()) + '</b><br>Капитал: <b>' + mny(netWorth()) + '</b></p>' +
+    '<button class="btn" id="againBtn">Играть заново</button><button class="btn alt" id="shareBtn">Поделиться</button></div>';
+  o.classList.add('show');
+}
+function share() {
+  const w = S.over && S.over.type === 'win';
+  const txt = w ? 'Я прошёл путь от бездомного до космоса за ' + S.day + ' дн.! Сможешь быстрее?' : 'Я дошёл до этапа «' + STAGES[S.stage].n + '» за ' + S.day + ' дн. Сможешь выше?';
+  const link = 'https://t.me/share/url?url=' + encodeURIComponent(SHARE_URL || location.href) + '&text=' + encodeURIComponent(txt);
+  if (tg && tg.openTelegramLink) { try { tg.openTelegramLink(link); return; } catch (e) {} }
+  window.open(link, '_blank');
+}
+function newGame() { S = fresh(); S.intro = true; M.fn = null; save(); render(); }
+
+document.addEventListener('click', e => {
+  if (!S) return;
+  const t = e.target;
+  if (t.closest('[data-close]')) { M.fn = null; render(); return; }
+  const b = t.closest('button[data-i]');
+  if (b) { if (!b.disabled) { const f = CUR[+b.dataset.i]; if (f) { hap(); act(f); } } return; }
+  const n = t.closest('#nav button'); if (n) { hap(); goTab(n.dataset.tab); return; }
+  if (t.closest('#wallet')) { M.fn = walletModal; render(); return; }
+  if (t.id === 'modal') { M.fn = null; render(); return; }
+  if (t.id === 'resetBtn') { if (confirm('Начать игру заново? Прогресс этого забега пропадёт.')) newGame(); return; }
+  if (t.id === 'startBtn') { S.intro = true; save(); render(); return; }
+  if (t.id === 'againBtn') { newGame(); return; }
+  if (t.id === 'shareBtn') { share(); return; }
+});
+
+function mergeDeep(base, src) {
+  if (!src || typeof src !== 'object') return base;
+  for (const k in src) {
+    if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k]) && base[k] && typeof base[k] === 'object' && !Array.isArray(base[k])) mergeDeep(base[k], src[k]);
+    else base[k] = src[k];
+  }
+  return base;
+}
+loadMeta();
+loadSave(saved => {
+  S = mergeDeep(fresh(), saved);
+  render();
+  if (API_URL) fetchTop();
+});
+
+</script>
+</body>
+</html>
