@@ -180,15 +180,38 @@ function fresh() {
   };
 }
 function save() {
+  S.ts = Date.now();
   const j = JSON.stringify(S);
   T(() => localStorage.setItem(KEY, j));
-  T(() => tg.CloudStorage.setItem(KEY, j.length < 4000 ? j : '{}'));
+  if (!cloudSave.h) cloudSave.h = setTimeout(() => { cloudSave.h = 0; cloudSave(); }, 4000);
+}
+// Резервная копия в облаке Telegram: кусками по 3500 символов (лимит значения 4096)
+function cloudSave() {
+  const cs = tg && tg.CloudStorage; if (!cs || !cs.setItem || !S) return;
+  try {
+    const j = JSON.stringify(S), n = Math.ceil(j.length / 3500);
+    for (let i = 0; i < n; i++) cs.setItem('bz' + i, j.slice(i * 3500, (i + 1) * 3500));
+    cs.setItem('bzn', String(n));
+  } catch (e) {}
 }
 function loadSave(cb) {
-  let j = null;
-  T(() => { j = localStorage.getItem(KEY); });
-  if (j) { try { cb(JSON.parse(j)); return; } catch (e) {} }
-  cb(null);
+  let local = null;
+  T(() => { const j = localStorage.getItem(KEY); if (j) local = JSON.parse(j); });
+  const cs = tg && tg.CloudStorage;
+  if (!cs || !cs.getItem || !cs.getItems) { cb(local); return; }
+  let done = false; const fin = v => { if (done) return; done = true; cb(v); };
+  setTimeout(() => fin(local), 2500);
+  try {
+    cs.getItem('bzn', (e, n) => {
+      n = parseInt(n) || 0;
+      if (e || !n) { fin(local); return; }
+      const keys = []; for (let i = 0; i < n; i++) keys.push('bz' + i);
+      cs.getItems(keys, (e2, vals) => {
+        try { const c = JSON.parse(keys.map(k => (vals && vals[k]) || '').join('')); fin(!local || (c.ts || 0) > (local.ts || 0) ? c : local); }
+        catch (x) { fin(local); }
+      });
+    });
+  } catch (e) { fin(local); }
 }
 let META = { best: null, runs: 0, wins: 0 };
 function loadMeta() { T(() => { const j = localStorage.getItem(META_KEY); if (j) META = Object.assign(META, JSON.parse(j)); }); }
@@ -1407,7 +1430,7 @@ TABS.biz = { ic: '🏪', n: 'Бизнес', from: 6, to: 10, view: bizView };
 
 /* ---------- ЭТАП 8: КОРПОРАЦИИ И РЕПУТАЦИЯ ---------- */
 DAILY.push(() => {
-  if (S.stage < 8 || S.stage > 10) return;
+  if (S.stage < 7 || S.stage > 10) return;
   for (const id of S.corps) {
     const c = CORPS.find(x => x.id === id);
     earn(c.price * c.y * (S.scandal > 0 ? 0.5 : 1));
@@ -1427,6 +1450,7 @@ function empireView() {
     B('🧯', 'Антикризисный PR', mny(pr) + ', снять скандал', () => { if (!pay2(pr)) return; S.scandal = 0; S.rep = clamp(S.rep + 5); say('🧯 Кризис потушен.', 'good'); }, S.scandal > 0 && rub() >= pr && wo, S.scandal > 0 ? (!wo ? why : 'Нужно ' + mny(pr)) : 'Скандалов нет'),
     B('⏭', 'Ждать день', '', () => waitDays(1))
   ]);
+  if (S.stage < 8) return h + box('Корпорации откроются на этапе магната. Сейчас здесь можно поднять репутацию.');
   h += sec('Корпорации (покупка: ' + whenTxt(9, 18, 'wd') + ')');
   h += CORPS.map(c => {
     const own = S.corps.includes(c.id);
@@ -1435,7 +1459,7 @@ function empireView() {
   }).join('');
   return h;
 }
-TABS.empire = { ic: '🏛️', n: 'Империя', from: 8, to: 10, view: empireView };
+TABS.empire = { ic: '🏛️', n: 'Империя', from: 7, to: 10, view: empireView };
 
 /* ---------- ЦЕЛИ ЭТАПОВ 6-8 (несколько условий) ---------- */
 const stocksHeld = () => Object.values(S.stk).filter(o => o.q > 0).length;
@@ -1455,7 +1479,7 @@ GOALS[7] = () => {
     { t: 'Капитал', cur: netWorth(), need: 120e6, money: 1 },
     { t: 'Разных акций в портфеле', cur: stocksHeld(), need: 3 },
     { t: 'Помещений в аренде', cur: S.estate.n, need: 2 },
-    { t: 'Репутация', cur: Math.round(S.rep), need: 45 }
+    { t: 'Репутация', cur: Math.round(S.rep), need: 45, hint: S.rep >= 45 ? '' : ' (вкладка «Империя»)' }
   ];
   const can = netWorth() >= 120e6 && stocksHeld() >= 3 && S.estate.n >= 2 && S.rep >= 45;
   return { items, btn: '🏛️ Стать магнатом', can, go() { setStage(8); } };
@@ -1833,7 +1857,7 @@ const CHANNELS = [
 ];
 function launderLeft(c) { const sh = S.sh; if (sh.lday !== S.day) { sh.lday = S.day; sh.lused = {}; } return Math.max(0, shBase() * c.cap - (sh.lused[c.id] || 0)); }
 function launder(c) {
-  const sh = S.sh, x = Math.min(sh.dirty, launderLeft(c));
+  const sh = S.sh, want = sh.lamt > 0 ? sh.lamt : Infinity, x = Math.min(sh.dirty, launderLeft(c), want);
   if (x <= 0) return toast('Сегодня больше не получится');
   if (!tick(1, 'out')) return;
   const loss = c.loss - Math.min(0.09, 0.03 * crewN('acc'));
@@ -1940,9 +1964,10 @@ function shadowView() {
     return B(o.ic, o.n, o.h + ' ч · ' + fmt(low) + '-' + fmt(hi) + ' · ' + whenTxt(o.win[0], o.win[1]), () => doOp(o), ok, rq || (did ? 'Сегодня уже' : !wok ? 'Только ' + whenTxt(o.win[0], o.win[1]) : S.energy < 25 ? 'Нет сил' : S.hp <= 25 ? 'Слишком плохо себя чувствуешь' : 'Лимит часов'));
   }));
   h += sec('Отмывание');
+  h += '<div class="chips"><span class="muted" style="align-self:center">Сумма:</span><input id="lamt" type="number" min="0" inputmode="numeric" placeholder="всё" value="' + (sh.lamt || '') + '" style="width:110px">' + [10, 25, 50, 100].map(p => mini(p + '%', () => { sh.lamt = Math.floor(sh.dirty * p / 100); })).join('') + mini('Сброс', () => { sh.lamt = 0; }) + '</div><div class="muted" style="margin-bottom:6px">' + (sh.lamt > 0 ? 'За раз отмоешь: ' + mny(Math.min(sh.lamt, sh.dirty)) : 'Пусто: отмывается максимум, что позволяет канал.') + '</div>';
   h += grid(CHANNELS.filter(c => S.stage >= c.min).map(c => {
-    const left = launderLeft(c), loss = Math.round(100 * (c.loss - Math.min(0.09, 0.03 * crewN('acc'))));
-    return B(c.ic, c.n, 'потеря ' + loss + '%, до ' + mny(left) + ' в день', () => launder(c), sh.dirty > 0 && left > 0 && c.ok(), sh.dirty <= 0 ? 'Нет грязных денег' : left <= 0 ? 'Лимит на сегодня' : c.why());
+    const left = Math.min(launderLeft(c), sh.lamt > 0 ? sh.lamt : Infinity, sh.dirty), loss = Math.round(100 * (c.loss - Math.min(0.09, 0.03 * crewN('acc'))));
+    return B(c.ic, c.n, 'потеря ' + loss + '%, сейчас ' + mny(left), () => launder(c), sh.dirty > 0 && left > 0 && c.ok(), sh.dirty <= 0 ? 'Нет грязных денег' : left <= 0 ? 'Лимит на сегодня' : c.why());
   }));
   h += sec('Внимание и защита');
   const bribeC = shBase() * 6;
@@ -1960,6 +1985,8 @@ function shadowView() {
   return h;
 }
 TABS.shadow = { ic: '🌑', n: 'Тень', from: 1, to: 10, vis: shVis, view: shadowView };
+
+document.addEventListener('input', e => { if (e.target && e.target.id === 'lamt' && S && S.sh) S.sh.lamt = Math.max(0, Math.floor(Number(e.target.value) || 0)); });
 
 /* --- 08_space.js --- */
 /* ============ КОСМИЧЕСКАЯ ВЕТКА: путь магната ракет ============ */
@@ -2187,7 +2214,7 @@ function goalHTML() {
   for (const it of g.items) {
     if (it.cur !== undefined) {
       const pct = Math.min(100, it.cur / it.need * 100);
-      h += '<div class="gi ' + (pct >= 100 ? 'done' : '') + '"><span>' + (pct >= 100 ? '✓' : '○') + ' ' + it.t + '</span><div class="pb"><i style="width:' + pct + '%"></i></div><span class="v">' + (it.money ? fmt(it.cur) + ' / ' + fmt(it.need) + ' ₽' : Math.floor(it.cur) + ' / ' + it.need) + '</span></div>';
+      h += '<div class="gi ' + (pct >= 100 ? 'done' : '') + '"><span>' + (pct >= 100 ? '✓' : '○') + ' ' + it.t + '</span><div class="pb"><i style="width:' + pct + '%"></i></div><span class="v">' + (it.money ? fmt(it.cur) + ' / ' + fmt(it.need) + ' ₽' : Math.floor(it.cur) + ' / ' + it.need) + (it.hint || '') + '</span></div>';
     } else h += '<div class="gi ' + (it.done ? 'done' : '') + '"><span>' + (it.done ? '✓' : '○') + ' ' + it.t + '</span><span class="v">' + (it.v || '') + '</span></div>';
   }
   if (g.btn && g.can) h += '<div class="acts" style="margin:8px 0 0">' + B('⭐', g.btn, 'Условия выполнены', () => g.go(), true, '', 'win big') + '</div>';
