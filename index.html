@@ -15,8 +15,8 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 input{font:inherit}
 #app{max-width:520px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;gap:8px;padding:10px 12px calc(76px + env(safe-area-inset-bottom))}
 .top{display:flex;align-items:center;gap:6px}
-.stagechip{flex:1;min-width:0;background:var(--card);padding:7px 10px;border-radius:12px;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chip{background:var(--card);padding:7px 9px;border-radius:12px;font-size:12px;white-space:nowrap}
+.stagechip{flex:1;min-width:0;background:var(--card);padding:7px 10px;border-radius:12px;font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{background:var(--card);padding:7px 8px;border-radius:12px;font-size:11px;white-space:nowrap}
 .money{background:var(--card);padding:7px 10px;border-radius:12px;font-weight:700;color:var(--gold);font-size:13px;white-space:nowrap}
 .muted{color:var(--muted);font-size:12px}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}
@@ -151,7 +151,7 @@ const M = { fn: null };       // модальное окно: функция, в
 const DAILY = [];             // ежедневные хуки
 const TABS = {};              // вкладки
 const GOALS = {};             // цели этапов
-const TAB_ORDER = ['yard', 'market', 'station', 'scrap', 'shelter', 'home', 'work', 'study', 'biz', 'invest', 'empire', 'politics', 'state', 'bank', 'casino', 'garage', 'rating'];
+const TAB_ORDER = ['yard', 'market', 'station', 'scrap', 'shelter', 'home', 'work', 'study', 'biz', 'invest', 'empire', 'politics', 'state', 'space', 'shadow', 'bank', 'casino', 'garage', 'rating'];
 
 /* ---------- состояние ---------- */
 function fresh() {
@@ -166,12 +166,15 @@ function fresh() {
     edu: { school: 0, uni: 0, exams: 0, visa: 0, visaDay: 0 }, major: null, mba: false,
     job: false, jobLvl: 0, jobXp: 0,
     team: 0, perf: 50, lowPerf: 0,
-    biz: { units: [], brand: 0, sup: 1, mgr: false, neglect: 0, crisis: 0, month: 0 },
+    biz: { units: [], brand: 0, sup: 1, mgr: false, dir: 0, susp: 0, neglect: 0, crisis: 0, month: 0 },
     stk, estate: { n: 0, price: 25e6 }, corps: [], scandal: 0, rep: 50,
     pol: { lvl: 0, appr: 50, next: 0, camp: 0 },
     st: { treasure: 50, people: 50, army: 50, science: 50, space: 0, card: null },
     fx: { r: { USD: 95, EUR: 103, CNY: 13.2 }, b: { USD: 95, EUR: 103, CNY: 13.2 }, h: { USD: [95], EUR: [103], CNY: [13.2] }, d: { USD: 0, EUR: 0, CNY: 0 } },
     azart: 0, chip: 0, game: 'slots', cas: { last: '', sub: '', bj: null, num: 17 },
+    sh: { on: false, offer: false, offerCd: 0, dirty: 0, heat: 0, auth: 0, crew: [], crime: false, crimeDay: 0, prison: null, case: null, press: null, ops: 0, opDay: 0, lday: 0, lused: {} },
+    path: 'pol', sp: null, retr: { to: null, n: 0 }, cd: {},
+    wh: 0, pend: [], lic: { broker: 0 }, fund: false,
     did: {}, stats: { casinoNet: 0, hosp: 0, falls: 0 }, stageDay: { 1: 1 },
     log: []
   };
@@ -220,6 +223,18 @@ const heal = n => { S.hp = clamp(S.hp + n); };
 const moodUp = n => { S.mood = clamp(S.mood + n); };
 const enUp = n => { S.energy = clamp(S.energy + n); };
 const inH = (a, b) => S.hour >= a && S.hour < b;
+const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const wday = () => (S.day - 1) % 7;
+const DAYTXT = { all: '', wd: 'Пн-Пт ', sixd: 'Пн-Сб ', we: 'Сб-Вс ', 'thu-sun': 'Чт-Вс ', 'fri-sat': 'Пт-Сб ' };
+function dayOk(d) { const w = wday(); return !d || d === 'all' || (d === 'wd' && w < 5) || (d === 'sixd' && w < 6) || (d === 'we' && w >= 5) || (d === 'thu-sun' && w >= 3) || (d === 'fri-sat' && (w === 4 || w === 5)); }
+function whenOk(a, b, d = 'all') { const h = S.hour; return (a <= b ? (h >= a && h < b) : (h >= a || h < b)) && dayOk(d); }
+const whenTxt = (a, b, d = 'all') => (DAYTXT[d] || '') + a + '-' + b;
+const canWork = h => S.wh + h <= 14;
+function logWork(h) {
+  S.wh += h;
+  const over = Math.max(0, Math.min(h, S.wh - 10));
+  if (over > 0) { hurt(1.5 * over); moodUp(-2 * over); say('⚠️ Переработка: сегодня уже ' + S.wh + ' ч. Здоровье и настроение страдают.', 'bad'); }
+}
 const isNightH = h => h >= 21 || h < 6;
 const isNight = () => isNightH(S.hour);
 function temp(day, hour) {
@@ -247,14 +262,14 @@ function closeBtn() { return '<div style="margin-top:10px">' + mini('Закры�
 const HSTEP = 0.5;
 function stepStats(mode) {
   const k = HSTEP;
-  if (S.stage >= 10) return;
+  if (S.stage >= 10 && S.path !== 'space') return;
   const sleeping = mode === 'sleepOut' || mode === 'sleepIn' || mode === 'sleepHome';
   const housed = S.housing > 0;
   const indoor = housed || mode === 'in' || mode === 'sleepIn';
   const q = housed ? HOUSING[S.housing].q : 1;
   S.food = clamp(S.food - (sleeping ? 1.5 : 2.5) * k);
   S.energy = clamp(S.energy + (sleeping ? (indoor ? 11 * q : 8) : -3) * k);
-  if (S.stage >= 2) S.mood = clamp(S.mood + (sleeping ? 1.5 * q : -0.7) * k);
+  if (S.stage >= 2) S.mood = clamp(S.mood + (sleeping ? 1.5 * q : (S.major === 'ped' ? -0.45 : -0.7)) * k);
   if (housed) S.warm = 100;
   else {
     const t = temp(S.day, S.hour);
@@ -270,7 +285,7 @@ function stepStats(mode) {
   if (S.energy <= 0) S.hp -= 2 * k;
   if (S.stage >= 2 && S.mood <= 0) S.hp -= 1.5 * k;
   const ok = S.food > 40 && S.warm > 40 && S.energy > 25 && (S.stage < 2 || S.mood > 25);
-  if (ok) S.hp += (sleeping ? 2 : 0.7) * k;
+  if (ok) S.hp += (sleeping ? 2 : 0.7) * k * (S.major === 'med' ? 1.5 : 1);
   S.hp = clamp(S.hp);
 }
 function tick(h, mode = 'out') {
@@ -284,22 +299,22 @@ function tick(h, mode = 'out') {
   return true;
 }
 function newDay() {
-  S.day++; S.did = {};
+  S.day++; S.did = {}; S.wh = 0;
   for (const f of DAILY) { try { f(); } catch (e) { console.error(e); } }
 }
 function collapse() {
   if (S.stage === 1) { die(); return false; }
-  const fee = Math.round(S.cash.RUB * 0.1); S.cash.RUB -= fee;
+  const fee = S.major === 'med' ? 0 : Math.round(S.cash.RUB * 0.1); S.cash.RUB -= fee;
   S.hp = 60; S.food = 60; S.energy = 60; S.mood = Math.max(S.mood, 40);
   S.stats.hosp++;
   say('🏥 Организм сдался. Неделя в больнице, счёт: ' + mny(fee) + '.', 'bad');
   for (let i = 0; i < 7; i++) newDay();
   return true;
 }
-function die() {
+function die(custom) {
   if (S.over) return;
   S.hp = 0;
-  const why = S.food <= 0 ? 'умер от голода' : S.warm <= 0 ? 'замёрз насмерть' : S.energy <= 0 ? 'упал без сил и не встал' : 'не пережил уличные разборки';
+  const why = custom ? custom : S.food <= 0 ? 'умер от голода' : S.warm <= 0 ? 'замёрз насмерть' : S.energy <= 0 ? 'упал без сил и не встал' : 'не пережил уличные разборки';
   S.over = { type: 'dead', why };
   note('error'); finishRun();
 }
@@ -312,14 +327,17 @@ function finishRun() {
 }
 
 /* ---------- пауза и пропуск дней ---------- */
+const foodMult = () => S.major === 'agro' ? 0.7 : S.major === 'tech' ? 0.8 : 1;
+const foodP = f => Math.round(f.p * foodMult());
 function autoEat() {
   const opts = FOODS.filter(f => f.min <= S.stage).reverse();
   const cap = Math.max(120, rub() * 0.01);
-  let f = opts.find(x => x.p <= cap && x.p <= rub());
-  if (!f) f = FOODS.find(x => x.p <= rub());
-  if (f) { S.cash.RUB -= f.p; eat(f.f); moodUp(f.m || 0); heal(f.h || 0); }
+  let f = opts.find(x => foodP(x) <= cap && foodP(x) <= rub());
+  if (!f) f = FOODS.find(x => foodP(x) <= rub());
+  if (f) { S.cash.RUB -= foodP(f); eat(f.f); moodUp(f.m || 0); heal(f.h || 0); }
 }
-function waitDays(n) {
+function waitDays(n, force) {
+  if (S.stage >= 6 && !force) n = Math.min(n, 1);
   for (let i = 0; i < n; i++) {
     if (S.over || S.stage === 1) break;
     autoEat(); if (!tick(8, 'sleepHome')) break;
@@ -329,12 +347,15 @@ function waitDays(n) {
 }
 
 /* ---------- смена этапов ---------- */
-function tabsNow() { return TAB_ORDER.filter(id => TABS[id] && S.stage >= TABS[id].from && S.stage <= TABS[id].to); }
+function tabsNow() {
+  if (S.sh && S.sh.prison) return ['shadow', 'rating'];
+  return TAB_ORDER.filter(id => TABS[id] && S.stage >= TABS[id].from && S.stage <= TABS[id].to && (!TABS[id].path || TABS[id].path === (S.path || 'pol')) && (!TABS[id].vis || TABS[id].vis()));
+}
 function setStage(n, kind, reason) {
   const up = n > S.stage;
   S.stage = n;
   if (!S.stageDay[n]) S.stageDay[n] = S.day;
-  const START = { 2: 'work', 3: 'study', 4: 'work', 5: 'work', 6: 'biz', 7: 'invest', 8: 'empire', 9: 'politics', 10: 'state' };
+  const START = { 2: 'work', 3: 'study', 4: 'work', 5: 'work', 6: 'biz', 7: 'invest', 8: 'empire', 9: S.path === 'space' ? 'space' : 'politics', 10: S.path === 'space' ? 'space' : 'state' };
   S.tab = (up && START[n] && tabsNow().includes(START[n])) ? START[n] : tabsNow()[0];
   S.did = {};
   if (up) { M.fn = () => stageModal(n); note('success'); }
@@ -342,11 +363,11 @@ function setStage(n, kind, reason) {
   save(); submitScore();
 }
 function stageModal(n) {
-  const st = STAGES[n];
+  const st = stg(n);
   return '<h2>' + st.ic + ' ' + st.n + '</h2><p>' + st.tag + '</p><ul>' + st.feat.map(f => '<li>' + f + '</li>').join('') + '</ul>' + '<button class="btn" id="mclose" data-close="1">Поехали</button>';
 }
 function fallModal(n, reason) {
-  const st = STAGES[n];
+  const st = stg(n);
   return '<h2>📉 Откат: ' + st.ic + ' ' + st.n + '</h2><p>' + reason + '</p><p>Падение не конец. Поднимайся снова.</p><button class="btn" data-close="1">Понял</button>';
 }
 function fall(n, reason) { say('📉 ' + reason, 'bad'); setStage(n, 'down', reason); }
@@ -391,37 +412,52 @@ const TRANS = [
 ];
 
 const FOODS = [
-  { id: 0, n: 'Готовка дома', ic: '🍳', p: 60, f: 30, m: -1, min: 2 },
-  { id: 1, n: 'Столовая', ic: '🍲', p: 150, f: 42, m: 1, min: 2 },
-  { id: 2, n: 'Кафе', ic: '☕', p: 450, f: 50, m: 4, min: 3 },
-  { id: 3, n: 'Доставка', ic: '🛵', p: 1000, f: 52, m: 6, h: 1, min: 4 },
-  { id: 4, n: 'Ресторан', ic: '🍷', p: 3000, f: 58, m: 10, h: 2, min: 5 },
-  { id: 5, n: 'Личный повар', ic: '👨‍🍳', p: 20000, f: 70, m: 16, h: 4, e: 5, min: 7 }
+  { id: 0, n: 'Готовка дома', ic: '🍳', p: 60, f: 30, m: -1, min: 2, w: [0, 24], d: 'all' },
+  { id: 1, n: 'Столовая', ic: '🍲', p: 150, f: 42, m: 1, min: 2, w: [8, 17], d: 'sixd' },
+  { id: 2, n: 'Кафе', ic: '☕', p: 450, f: 50, m: 4, min: 3, w: [8, 23], d: 'all' },
+  { id: 3, n: 'Доставка', ic: '🛵', p: 1000, f: 52, m: 6, h: 1, min: 4, w: [9, 23], d: 'all' },
+  { id: 4, n: 'Ресторан', ic: '🍷', p: 3000, f: 58, m: 10, h: 2, min: 5, w: [12, 24], d: 'all' },
+  { id: 5, n: 'Личный повар', ic: '👨‍🍳', p: 20000, f: 70, m: 16, h: 4, e: 5, min: 7, w: [0, 24], d: 'all' }
 ];
 
 const LEISURE = [
-  { n: 'Прогулка', ic: '🚶', h: 2, cost: 0, mood: 10, en: -2, min: 2 },
-  { n: 'Кино', ic: '🎬', h: 3, cost: 700, mood: 20, min: 2 },
-  { n: 'Клуб', ic: '🕺', h: 4, cost: 4000, mood: 30, hp: -3, en: -8, min: 3 },
-  { n: 'Спа и массаж', ic: '💆', h: 3, cost: 25000, mood: 25, hp: 6, en: 10, min: 5 },
-  { n: 'Отпуск на 5 дней', ic: '🏝️', days: 5, cost: 400000, mood: 80, hp: 25, min: 5 }
+  { n: 'Прогулка', ic: '🚶', h: 2, cost: 0, mood: 10, en: -2, min: 2, w: [0, 24], d: 'all' },
+  { n: 'Кино', ic: '🎬', h: 3, cost: 700, mood: 20, min: 2, w: [10, 23], d: 'all' },
+  { n: 'Клуб', ic: '🕺', h: 4, cost: 4000, mood: 30, hp: -3, en: -8, min: 3, w: [22, 5], d: 'thu-sun' },
+  { n: 'Спа и массаж', ic: '💆', h: 3, cost: 25000, mood: 25, hp: 6, en: 10, min: 5, w: [9, 21], d: 'all' },
+  { n: 'Отпуск на 5 дней', ic: '🏝️', days: 5, cost: 400000, mood: 80, hp: 25, min: 5, w: [0, 24], d: 'all' }
 ];
 
 const JOBS2 = [
-  { id: 'yard', n: 'Дворник', ic: '🧹', h: 6, pay: 1100, en: 8, mo: 6 },
-  { id: 'courier', n: 'Курьер', ic: '🛵', h: 5, pay: 800, en: 8, mo: 5, tips: 1 },
-  { id: 'loader', n: 'Грузчик', ic: '📦', h: 4, pay: 700, en: 12, mo: 4 },
-  { id: 'guard', n: 'Ночной сторож', ic: '🔦', h: 8, pay: 1500, en: 10, mo: 10, night: 1 }
+  { id: 'yard', n: 'Дворник', ic: '🧹', h: 6, pay: 1100, en: 8, mo: 6, win: [5, 11], d: 'all' },
+  { id: 'courier', n: 'Курьер', ic: '🛵', h: 5, pay: 800, en: 8, mo: 5, tips: 1, win: [9, 21], d: 'all' },
+  { id: 'loader', n: 'Грузчик', ic: '📦', h: 4, pay: 700, en: 12, mo: 4, win: [7, 13], d: 'sixd' },
+  { id: 'guard', n: 'Ночной сторож', ic: '🔦', h: 8, pay: 1500, en: 10, mo: 10, win: [20, 24], d: 'all' },
+  { id: 'seller', n: 'Продавец', ic: '🏷️', h: 8, pay: 1000, en: 6, mo: 5, win: [8, 12], d: 'sixd' },
+  { id: 'waiter', n: 'Официант', ic: '🍽️', h: 6, pay: 700, en: 8, mo: 5, tips: 1, win: [16, 20], d: 'all' },
+  { id: 'cleaner', n: 'Уборщик в офисах', ic: '🧽', h: 4, pay: 600, en: 8, mo: 3, win: [18, 21], d: 'wd' },
+  { id: 'taxi', n: 'Таксист на своей машине', ic: '🚕', h: 6, pay: 1900, en: 10, mo: 6, win: [6, 22], d: 'all', tips: 1, req: () => S.transport >= 3 }
 ];
 const JOBS3 = [
-  { id: 'barista', n: 'Бариста', ic: '☕', h: 4, pay: 900, en: 6, mo: 4 },
-  { id: 'courier', n: 'Курьер', ic: '🛵', h: 5, pay: 800, en: 8, mo: 5, tips: 1 },
-  { id: 'free', n: 'Фриланс', ic: '💻', h: 3, pay: 0, en: 6, mo: 4, free: 1 }
+  { id: 'barista', n: 'Бариста', ic: '☕', h: 4, pay: 900, en: 6, mo: 4, win: [7, 15], d: 'all' },
+  { id: 'courier', n: 'Курьер', ic: '🛵', h: 5, pay: 800, en: 8, mo: 5, tips: 1, win: [9, 21], d: 'all' },
+  { id: 'free', n: 'Фриланс', ic: '💻', h: 3, pay: 0, en: 6, mo: 4, free: 1, win: [0, 24], d: 'all' },
+  { id: 'tutor', n: 'Репетитор', ic: '📓', h: 2, pay: 500, en: 4, mo: 3, win: [15, 21], d: 'wd', tutor: 1 },
+  { id: 'lab', n: 'Лаборант на кафедре', ic: '🧫', h: 4, pay: 1100, en: 6, mo: 4, win: [9, 15], d: 'wd', req: () => S.edu.uni >= 15 }
 ];
 const MAJORS = [
-  { id: 'it', n: 'Информатика', ic: '💻', mult: 1.3, mo: 12, titles: ['Джуниор-разработчик', 'Разработчик', 'Ведущий разработчик'] },
-  { id: 'eco', n: 'Экономика', ic: '📊', mult: 1.15, mo: 10, titles: ['Помощник аналитика', 'Аналитик', 'Ведущий аналитик'] },
-  { id: 'tech', n: 'Технологии', ic: '🧪', mult: 1.0, mo: 8, titles: ['Лаборант-технолог', 'Технолог', 'Главный технолог'] }
+  { id: 'it', n: 'Информатика', ic: '💻', mult: 1.3, mo: 12, en: 10, diff: 0.05, h: 9, win: [10, 12], d: 'wd', remote: true, perk: 'Удалёнка без дороги, фриланс ×1,5', titles: ['Джуниор-разработчик', 'Разработчик', 'Ведущий разработчик'] },
+  { id: 'eco', n: 'Экономика', ic: '📊', mult: 1.15, mo: 10, en: 6, diff: 0.04, h: 9, win: [9, 11], d: 'wd', perk: 'Банк: вклад 20%, кредит 17%, спред обмена 1%', titles: ['Помощник аналитика', 'Аналитик', 'Ведущий аналитик'] },
+  { id: 'tech', n: 'Технологии', ic: '🧪', mult: 1.0, mo: 8, en: 8, diff: 0.03, h: 9, win: [8, 10], d: 'wd', perk: 'Еда дешевле на 20%', titles: ['Лаборант-технолог', 'Технолог', 'Главный технолог'] },
+  { id: 'med', n: 'Медицина', ic: '🩺', mult: 1.2, mo: 12, en: 14, diff: 0.1, h: 12, win: [7, 9], d: 'sixd', perk: 'Бесплатная больница, лечение быстрее, ночные дежурства', titles: ['Фельдшер', 'Врач', 'Заведующий отделением'] },
+  { id: 'law', n: 'Юриспруденция', ic: '⚖️', mult: 1.25, mo: 10, en: 6, diff: 0.08, h: 9, win: [9, 11], d: 'wd', perk: 'Штрафы -40%, юристы и адвокаты вдвое дешевле', titles: ['Помощник юриста', 'Юрист', 'Старший юрист'] },
+  { id: 'eng', n: 'Инженерия', ic: '⚙️', mult: 1.1, mo: 8, en: 12, diff: 0.06, h: 9, win: [8, 10], d: 'wd', perk: 'Поломки и поставщики вдвое дешевле', titles: ['Инженер-стажёр', 'Инженер', 'Ведущий инженер'] },
+  { id: 'ped', n: 'Педагогика', ic: '🍎', mult: 0.8, mo: 7, en: 6, diff: 0.02, h: 6, win: [8, 10], d: 'wd', perk: 'Короткий день, учёба на 20% быстрее, репетиторство, настроение падает медленнее', titles: ['Помощник учителя', 'Учитель', 'Завуч'] },
+  { id: 'des', n: 'Дизайн', ic: '🎨', mult: 1.0, mo: 8, en: 6, diff: 0.03, h: 8, win: [10, 13], d: 'wd', remote: true, perk: 'Удалёнка, реклама на 30% дешевле и сильнее', titles: ['Младший дизайнер', 'Дизайнер', 'Арт-директор'] },
+  { id: 'sci', n: 'Наука', ic: '🔬', mult: 0.95, mo: 6, en: 8, diff: 0.1, h: 9, win: [9, 12], d: 'wd', perk: 'Гранты, бонус к науке на этапе президента', titles: ['Лаборант-исследователь', 'Научный сотрудник', 'Заведующий лабораторией'] },
+  { id: 'log', n: 'Логистика', ic: '🚚', mult: 0.95, mo: 9, en: 10, diff: 0.03, h: 10, win: [6, 9], d: 'sixd', perk: 'Дорога короче на полчаса, бизнес вмещает на точку больше', titles: ['Диспетчер', 'Логист', 'Руководитель логистики'] },
+  { id: 'media', n: 'Медиа', ic: '🎙️', mult: 0.9, mo: 9, en: 8, diff: 0.02, h: 9, win: [11, 14], d: 'sixd', perk: 'Репутация и митинги работают сильнее', titles: ['Стажёр-корреспондент', 'Журналист', 'Главный редактор'] },
+  { id: 'agro', n: 'Агрономия', ic: '🌾', mult: 0.85, mo: 6, en: 14, diff: 0.04, h: 10, win: [6, 9], d: 'sixd', perk: 'Своя ферма даёт доход, еда дешевле на 30%', titles: ['Помощник агронома', 'Агроном', 'Главный агроном'] }
 ];
 const CAREER_PAY = [10000, 20000, 35000];
 const CAREER_XP = [0, 15, 40];
@@ -489,8 +525,8 @@ const LOCS = {
   yard: { ic: '🏚️', n: 'Двор', d: 'Гаражи, помойка, скамейка.' },
   market: { ic: '🛒', n: 'Рынок', d: 'Шумно и людно. Работает 8-20.' },
   station: { ic: '🚉', n: 'Вокзал', d: 'Тепло и людно. Патруль тоже.' },
-  scrap: { ic: '♻️', n: 'Промзона', d: 'Пункт приёма 9-18. Стекло и металл.' },
-  shelter: { ic: '⛪', n: 'Приют', d: 'Суп 12-15, ночлег 19-23, соцработник 9-17.' }
+  scrap: { ic: '♻️', n: 'Промзона', d: 'Пункт приёма Пн-Сб 9-18. Стекло и металл.' },
+  shelter: { ic: '⛪', n: 'Приют', d: 'Суп 12-15, ночлег 19-23, соцработник Пн-Пт 9-17.' }
 };
 const BOTTLE = 6, METAL = 30;
 const FOOD1 = [
@@ -602,11 +638,11 @@ function streetActs(loc) {
     A.push(B('😴', 'Спать в зале', '8 ч, тепло, риск', () => sleepStreet('sleepIn', 0.25, 'зал ожидания', true)));
   }
   if (loc === 'scrap') {
-    const so = inH(9, 18), has = S.bottles + S.metal > 0;
+    const so = whenOk(9, 18, 'sixd'), has = S.bottles + S.metal > 0;
     A.push(B('💰', 'Сдать тару и лом', S.bottles + '×' + BOTTLE + ' + ' + S.metal + '×' + METAL + ' ₽', () => {
       const sum = S.bottles * BOTTLE + S.metal * METAL;
       earn(sum); say('Сдал тару и лом на ' + sum + ' ₽.', 'good'); S.bottles = 0; S.metal = 0; note('success');
-    }, so && has, !so ? 'Пункт закрыт (9-18)' : 'Нечего сдавать'));
+    }, so && has, !so ? 'Пункт: ' + whenTxt(9, 18, 'sixd') : 'Нечего сдавать'));
     A.push(B('🔩', 'Искать металлолом', '3 ч', () => {
       if (!tick(3, 'out')) return;
       const n = Math.min(rand(1, 4), Math.floor(freeLoad() / 3));
@@ -633,18 +669,18 @@ function streetActs(loc) {
       if (!tick(2, 'in')) return;
       say('Посидел в тепле, отошли пальцы.', 'good'); maybeEvent(0.1);
     }, inH(8, 21), 'Закрыто до 8:00'));
-    const sw = inH(9, 17);
+    const sw = whenOk(9, 17, 'wd');
     if (S.pass === 0) {
       A.push(B('🪪', 'Подать на паспорт', '1500 ₽, готов через 3 дня', () => {
         if (!pay(1500)) return toast('Не хватает денег');
         if (!tick(1, 'in')) return;
         S.pass = 1; S.passDay = S.day + 3; say('Соцработник оформил заявление на паспорт. Ждать 3 дня.', 'good'); note('success');
-      }, sw && rub() >= 1500, !sw ? 'Соцработник 9-17' : 'Нужно 1500 ₽'));
+      }, sw && rub() >= 1500, !sw ? 'Соцработник ' + whenTxt(9, 17, 'wd') : 'Нужно 1500 ₽'));
     } else if (S.pass === 1) {
       A.push(B('🪪', 'Забрать паспорт', S.day >= S.passDay ? 'готов!' : 'будет на день ' + S.passDay, () => {
         if (!tick(1, 'in')) return;
         S.pass = 2; say('Паспорт на руках. Теперь ты снова человек с документами.', 'good'); note('success');
-      }, sw && S.day >= S.passDay, !sw ? 'Соцработник 9-17' : 'Ещё не готов'));
+      }, sw && S.day >= S.passDay, !sw ? 'Соцработник ' + whenTxt(9, 17, 'wd') : 'Ещё не готов'));
     }
   }
   A.push(B('⏳', 'Переждать', '1 ч', waitStreet));
@@ -691,7 +727,9 @@ GOALS[1] = () => ({
 /* --- 04_city.js --- */
 /* ============ ЭТАПЫ 2-5: ДОМ, РАБОТА, УЧЁБА, ТРАНСПОРТ ============ */
 const MAJ = () => MAJORS.find(m => m.id === S.major) || MAJORS[2];
-const commute = () => TRANS[S.transport].c;
+const commute = () => { let c = TRANS[S.transport].c; if (S.major === 'log') c = Math.max(0, c - 0.5); return c; };
+const freeMult = () => (S.major === 'it' ? 1.5 : S.major === 'ped' || S.major === 'des' ? 1.2 : 1);
+const careerPay = () => Math.round(CAREER_PAY[S.jobLvl] * MAJ().mult * (S.mba ? 1.25 : 1));
 const stagePrice = k => k; // зарезервировано под инфляцию
 
 /* ---------- ежедневные расходы ---------- */
@@ -714,7 +752,7 @@ function evict() {
   }
 }
 DAILY.push(() => {
-  if (S.stage === 1 || S.stage >= 10) return;
+  if (S.stage === 1 || (S.stage >= 10 && S.path !== 'space')) return;
   if (S.stage === 3) earn(100);
   payBill(HOUSING[S.housing].up + (TRANS[S.transport].up || 0), 'жильё и транспорт');
   S.azart = Math.max(0, S.azart - 12);
@@ -758,14 +796,14 @@ function sleepHome(h) {
   say(h >= 6 ? '😴 Выспался.' : '💤 Вздремнул.', 'good');
 }
 function eatTier(f) {
-  if (!pay(f.p)) return toast('Не хватает денег');
+  if (!pay(foodP(f))) return toast('Не хватает денег');
   if (!tick(0.5, 'home')) return;
   eat(f.f); moodUp(f.m || 0); heal(f.h || 0); enUp(f.e || 0);
-  say(f.ic + ' ' + f.n + ' за ' + mny(f.p) + '.');
+  say(f.ic + ' ' + f.n + ' за ' + mny(foodP(f)) + '.');
 }
 function doLeisure(l) {
   if (!pay(l.cost)) return toast('Не хватает денег');
-  if (l.days) { waitDays(l.days); } else if (!tick(l.h, 'home')) return;
+  if (l.days) { waitDays(l.days, true); } else if (!tick(l.h, 'home')) return;
   moodUp(l.mood); heal(l.hp || 0); enUp(l.en || 0);
   if (l.hp && l.hp < 0) hurt(-l.hp);
   say(l.ic + ' ' + l.n + (l.cost ? ' (' + mny(l.cost) + ')' : '') + '. Настроение +' + l.mood + '.', 'good');
@@ -794,67 +832,89 @@ function homeView() {
   h += grid([
     B('😴', 'Спать', '8 ч', () => sleepHome(8)),
     B('💤', 'Вздремнуть', '2 ч', () => sleepHome(2)),
-    B('🏘️', 'Сменить жильё', 'аренда и покупка', () => { M.fn = housingModal; })
+    B('⏳', 'Подождать', '1 ч', () => { tick(1, 'home'); }),
+    B('🏘️', 'Сменить жильё', 'аренда и покупка · ' + whenTxt(9, 20, 'sixd'), () => { M.fn = housingModal; }, whenOk(9, 20, 'sixd'), 'Открыто ' + whenTxt(9, 20, 'sixd'))
   ].concat(S.stage >= 4 ? [B('⏭', 'Ждать день', 'пока всё идёт', () => waitDays(1))] : [])
-    .concat(S.stage >= 5 ? [B('⏩', 'Ждать неделю', '7 дней', () => waitDays(7))] : []));
+    .concat(S.stage === 5 ? [B('⏩', 'Ждать неделю', '7 дней', () => waitDays(7))] : []));
   h += sec('Еда');
-  h += grid(FOODS.filter(f => f.min <= S.stage).map(f => B(f.ic, f.n, mny(f.p) + ', +' + f.f + (f.m > 0 ? ', 🙂+' + f.m : ''), () => eatTier(f), rub() >= f.p, 'Нужно ' + mny(f.p))));
+  h += grid(FOODS.filter(f => f.min <= S.stage).map(f => { const wo = whenOk(f.w[0], f.w[1], f.d); return B(f.ic, f.n, mny(foodP(f)) + ', +' + f.f + (f.m > 0 ? ', 🙂+' + f.m : '') + (f.w[1] - f.w[0] < 24 ? ' · ' + whenTxt(f.w[0], f.w[1], f.d) : ''), () => eatTier(f), rub() >= foodP(f) && wo, !wo ? 'Открыто ' + whenTxt(f.w[0], f.w[1], f.d) : 'Нужно ' + mny(foodP(f))); }));
   h += sec('Досуг');
-  h += grid(LEISURE.filter(l => l.min <= S.stage).map(l => B(l.ic, l.n, (l.days ? l.days + ' дн' : l.h + ' ч') + (l.cost ? ', ' + mny(l.cost) : ', бесплатно') + ', 🙂+' + l.mood, () => doLeisure(l), rub() >= l.cost, 'Нужно ' + mny(l.cost))));
+  h += grid(LEISURE.filter(l => l.min <= S.stage).map(l => { const wo = whenOk(l.w[0], l.w[1], l.d) && (!l.days || S.stage < 6 || S.pend.length === 0); return B(l.ic, l.n, (l.days ? l.days + ' дн' : l.h + ' ч') + (l.cost ? ', ' + mny(l.cost) : ', бесплатно') + ', 🙂+' + l.mood + (l.w[1] - l.w[0] !== 24 ? ' · ' + whenTxt(l.w[0], l.w[1], l.d) : ''), () => doLeisure(l), rub() >= l.cost && wo, !wo ? (l.days ? 'Сначала срочные дела' : 'Открыто ' + whenTxt(l.w[0], l.w[1], l.d)) : 'Нужно ' + mny(l.cost)); }));
   return h;
 }
 TABS.home = { ic: '🏠', n: 'Дом', from: 2, to: 10, view: homeView };
 
 /* ---------- РАБОТА ---------- */
 function shift(j, payv) {
-  if (!tick(commute(), 'out')) return;
+  if (!j.free) { if (!tick(commute(), 'out')) return; }
   if (!tick(j.h, 'out')) return;
-  enUp(-j.en); moodUp(-j.mo); S.did[j.id] = 1; earn(payv);
+  enUp(-j.en); moodUp(-j.mo); S.did[j.id] = 1; earn(payv); logWork((j.free ? 0 : commute()) + j.h);
   say(j.ic + ' ' + j.n + ': +' + mny(payv), 'good');
 }
 function jobsGrid(list) {
-  return grid(list.map(j => {
+  return grid(list.filter(j => !j.req || j.req()).map(j => {
     let p = j.pay;
     if (j.tips) p = Math.round(j.pay * (1 + 0.15 * Math.min(4, S.transport)));
     if (j.free) p = Math.round((300 + 30 * S.edu.uni) * MAJ().mult);
-    const nightOk = !j.night || S.hour >= 21 || S.hour <= 2;
-    const ok = !S.did[j.id] && S.energy >= 25 && nightOk;
-    const why = S.did[j.id] ? 'Сегодня уже работал' : S.energy < 25 ? 'Нет сил' : 'Только с 21:00';
-    return B(j.ic, j.n, j.h + ' ч + дорога · ~' + mny(p), () => shift(j, j.tips ? Math.round(p * rf(0.8, 1.3)) : p), ok, why);
+    if (j.tutor) p = Math.round((500 + 20 * S.edu.uni) * (S.major === 'ped' ? 1.2 : 1));
+    const w = j.win || [0, 24], wok = whenOk(w[0], w[1], j.d), cw = canWork((j.free ? 0 : commute()) + j.h);
+    const ok = !S.did[j.id] && S.energy >= 25 && wok && cw;
+    const why = S.did[j.id] ? 'Сегодня уже работал' : S.energy < 25 ? 'Нет сил' : !wok ? 'Старт ' + whenTxt(w[0], w[1], j.d) : 'Лимит часов на сегодня';
+    return B(j.ic, j.n, j.h + ' ч' + (j.free ? '' : ' + дорога') + ' · ~' + mny(p) + ' · ' + whenTxt(w[0], w[1], j.d), () => shift(j, j.tips ? Math.round(p * rf(0.8, 1.3)) : p), ok, why);
   }));
 }
 function careerView() {
   const m = MAJ(); const nx = S.jobLvl < 2 ? CAREER_XP[S.jobLvl + 1] : null;
-  const pay = Math.round(CAREER_PAY[S.jobLvl] * m.mult * (S.mba ? 1.25 : 1));
-  let h = box('<b>' + (S.job ? m.ic + ' ' + m.titles[S.jobLvl] : '😶 Без работы') + '</b><div class="muted">Опыт: ' + S.jobXp + (nx ? '/' + nx : ' (максимум)') + ' · смена ' + mny(pay) + (S.mba ? ' (MBA +25%)' : '') + '</div>');
+  const pay = careerPay(), cm = m.remote ? 0 : commute(), sh = m.h, wk = [m.win[0], m.win[1], m.d];
+  let h = box('<b>' + (S.job ? m.ic + ' ' + m.titles[S.jobLvl] : '😶 Без работы') + '</b><div class="muted">Опыт: ' + S.jobXp + (nx ? '/' + nx : ' (максимум)') + ' · смена ' + mny(pay) + (S.mba ? ' (MBA +25%)' : '') + '<br>' + m.n + ': ' + sh + ' ч, старт ' + whenTxt(wk[0], wk[1], wk[2]) + '. Часов сегодня: ' + S.wh + '/14 (после 10 переработка).<br>Перк: ' + m.perk + '</div>');
   const A = [];
   if (S.job) {
-    A.push(B('💼', 'Рабочая смена', '9 ч + дорога · ' + mny(pay), () => {
-      if (!tick(commute(), 'out')) return; if (!tick(9, 'out')) return;
-      enUp(-10); moodUp(-m.mo); S.did.career = 1; earn(pay); S.jobXp++;
+    const wok = whenOk(wk[0], wk[1], wk[2]), cw = canWork(cm + sh), cb = S.sh.crime && ['law', 'med', 'ped'].includes(S.major);
+    A.push(B('💼', 'Рабочая смена', sh + ' ч' + (cm ? ' + дорога' : '') + ' · ' + mny(pay), () => {
+      if (cm && !tick(cm, 'out')) return; if (!tick(sh, 'out')) return;
+      enUp(-m.en); moodUp(-m.mo); S.did.career = 1; earn(pay); S.jobXp++; logWork(cm + sh);
       say('💼 Смена закрыта: +' + mny(pay), 'good');
       if (S.jobLvl < 2 && S.jobXp >= CAREER_XP[S.jobLvl + 1]) { S.jobLvl++; say('🎉 Повышение: ' + m.titles[S.jobLvl] + '!', 'good'); note('success'); }
-    }, !S.did.career && S.energy >= 25, S.did.career ? 'Сегодня уже работал' : 'Нет сил'));
+    }, !S.did.career && S.energy >= 25 && wok && cw && !cb, cb ? 'Судимость закрывает профессию' : S.did.career ? 'Сегодня уже работал' : S.energy < 25 ? 'Нет сил' : !wok ? 'Старт ' + whenTxt(wk[0], wk[1], wk[2]) : 'Лимит часов'));
+    const ov = Math.round(pay * 0.35);
+    A.push(B('🌙', 'Сверхурочные', '3 ч, ' + mny(ov) + ', ' + whenTxt(18, 22, 'wd'), () => {
+      if (!tick(3, 'out')) return; enUp(-6); moodUp(-5); S.did.over = 1; earn(ov); logWork(3); say('🌙 Задержался на работе: +' + mny(ov), 'good');
+    }, !!S.did.career && !S.did.over && whenOk(18, 22, 'wd') && canWork(3) && S.energy >= 25, !S.did.career ? 'Сначала смена' : S.did.over ? 'Сегодня уже' : 'Окно ' + whenTxt(18, 22, 'wd')));
+    if (S.major === 'med') {
+      const duty = Math.round(pay * 0.8);
+      A.push(B('🌙', 'Ночное дежурство', '8 ч, ' + mny(duty) + ', ' + whenTxt(20, 24), () => {
+        if (!tick(8, 'out')) return; enUp(-14); moodUp(-10); S.did.duty = 1; earn(duty); logWork(8); say('🩺 Ночное дежурство отработано: +' + mny(duty), 'good');
+      }, !S.did.duty && whenOk(20, 24) && canWork(8) && S.energy >= 35, S.did.duty ? 'Сегодня уже' : S.energy < 35 ? 'Нет сил' : 'Старт ' + whenTxt(20, 24)));
+    }
+    if (S.major === 'sci') {
+      S.cd = S.cd || {};
+      const gok = (S.cd.grant || 0) <= S.day && whenOk(10, 17, 'wd');
+      A.push(B('📑', 'Заявка на грант', '3 ч, шанс 40%, до 300 тыс, ' + whenTxt(10, 17, 'wd'), () => {
+        if (!tick(3, 'out')) return; S.cd.grant = S.day + 5; logWork(3);
+        if (Math.random() < 0.4) { const g = rand(150000, 300000); earn(g); say('📑 Грант одобрен: +' + mny(g), 'good'); note('success'); } else say('📑 В гранте отказали.', 'bad');
+      }, gok, (S.cd.grant || 0) > S.day ? 'Следующая заявка с дня ' + S.cd.grant : 'Только ' + whenTxt(10, 17, 'wd')));
+    }
   } else {
-    A.push(B('🔎', 'Искать работу', '3 ч, шанс 75%', () => {
+    A.push(B('🔎', 'Искать работу', '3 ч, шанс 75%, ' + whenTxt(9, 18, 'wd'), () => {
       if (!tick(3, 'out')) return;
-      if (Math.random() < 0.75) { S.job = true; say('Нашёл работу: ' + m.titles[S.jobLvl] + '.', 'good'); } else say('Собеседования без результата.', 'bad');
-    }));
+      if (Math.random() < (S.sh.crime ? 0.45 : 0.75)) { S.job = true; say('Нашёл работу: ' + m.titles[S.jobLvl] + '.', 'good'); } else say('Собеседования без результата.', 'bad');
+    }, whenOk(9, 18, 'wd'), 'Только ' + whenTxt(9, 18, 'wd')));
   }
-  A.push(B('💻', 'Фриланс', '3 ч · ~' + mny(Math.round((300 + 30 * S.edu.uni) * m.mult * 2)), () => shift({ id: 'free', n: 'Фриланс', ic: '💻', h: 3, en: 6, mo: 4 }, Math.round((300 + 30 * S.edu.uni) * m.mult * 2)), !S.did.free && S.energy >= 25, S.did.free ? 'Сегодня уже' : 'Нет сил'));
+  const fp = Math.round((300 + 30 * S.edu.uni) * m.mult * 2 * freeMult());
+  A.push(B('💻', S.major === 'ped' ? 'Репетиторство' : 'Фриланс', '3 ч · ~' + mny(fp) + ' · в любое время', () => shift({ id: 'free', n: S.major === 'ped' ? 'Репетиторство' : 'Фриланс', ic: '💻', h: 3, en: 6, mo: 4, free: 1 }, fp), !S.did.free && S.energy >= 25 && canWork(3), S.did.free ? 'Сегодня уже' : S.energy < 25 ? 'Нет сил' : 'Лимит часов'));
   return h + grid(A);
 }
 function managerView() {
-  const pay = Math.round(150000 * (0.5 + S.perf / 100));
-  let h = box('<b>📊 Руководитель отдела</b><div class="muted">Команда ' + S.team + '/8 · KPI ' + Math.round(S.perf) + '% · зарплаты ' + mny(S.team * 10000) + '/день' + (S.lowPerf ? ' · ⚠️ KPI ниже 25% дней: ' + S.lowPerf + '/5' : '') + '</div>');
+  const pay = Math.round(150000 * (0.5 + S.perf / 100)), wd = whenOk(8, 18, 'wd');
+  let h = box('<b>📊 Руководитель отдела</b><div class="muted">Команда ' + S.team + '/8 · KPI ' + Math.round(S.perf) + '% · зарплаты ' + mny(S.team * 10000) + '/день' + (S.lowPerf ? ' · ⚠️ KPI ниже 25%: ' + S.lowPerf + '/5 дн.' : '') + '<br>Рабочий день ' + whenTxt(8, 11, 'wd') + ' (старт). Часов сегодня: ' + S.wh + '/14.</div>');
   h += grid([
     B('💼', 'Работать', '9 ч + дорога · ' + mny(pay), () => {
       if (!tick(commute(), 'out')) return; if (!tick(9, 'out')) return;
-      enUp(-10); moodUp(-8); S.did.mgr = 1; earn(pay); say('📊 Рабочий день: +' + mny(pay), 'good');
-    }, !S.did.mgr && S.energy >= 25, S.did.mgr ? 'Сегодня уже' : 'Нет сил'),
-    B('🗣️', 'Планёрка', '1 ч, KPI вверх', () => { if (!tick(1, 'out')) return; S.plan = 1; S.did.plan = 1; S.perf = clamp(S.perf + 8); say('Планёрка прошла бодро. KPI растёт.', 'good'); }, !S.did.plan, 'Уже проводил'),
-    B('🧑‍💻', 'Нанять сотрудника', mny(300000), () => { if (!pay2(300000)) return; S.team++; say('Новый сотрудник в команде.', 'good'); }, S.team < 8 && rub() >= 300000, S.team >= 8 ? 'Команда полная' : 'Нужно 300 тыс'),
-    B('🚪', 'Уволить', 'снижает расходы', () => { S.team--; say('Расстался с сотрудником.'); }, S.team > 0, 'Некого')
+      enUp(-10); moodUp(-8); S.did.mgr = 1; earn(pay); logWork(commute() + 9); say('📊 Рабочий день: +' + mny(pay), 'good');
+    }, !S.did.mgr && S.energy >= 25 && whenOk(8, 11, 'wd') && canWork(commute() + 9), S.did.mgr ? 'Сегодня уже' : S.energy < 25 ? 'Нет сил' : !whenOk(8, 11, 'wd') ? 'Старт ' + whenTxt(8, 11, 'wd') : 'Лимит часов'),
+    B('🗣️', 'Планёрка', '1 ч, KPI вверх, ' + whenTxt(8, 18, 'wd'), () => { if (!tick(1, 'out')) return; S.plan = 1; S.did.plan = 1; logWork(1); S.perf = clamp(S.perf + 8); say('Планёрка прошла бодро. KPI растёт.', 'good'); }, !S.did.plan && wd, S.did.plan ? 'Уже проводил' : 'Только ' + whenTxt(8, 18, 'wd')),
+    B('🧑‍💻', 'Нанять сотрудника', mny(300000) + ', ' + whenTxt(9, 18, 'wd'), () => { if (!pay2(300000)) return; S.team++; say('Новый сотрудник в команде.', 'good'); }, S.team < 8 && rub() >= 300000 && whenOk(9, 18, 'wd'), S.team >= 8 ? 'Команда полная' : !whenOk(9, 18, 'wd') ? 'Только ' + whenTxt(9, 18, 'wd') : 'Нужно 300 тыс'),
+    B('🚪', 'Уволить', 'снижает расходы', () => { S.team--; say('Расстался с сотрудником.'); }, S.team > 0 && whenOk(9, 18, 'wd'), S.team > 0 ? 'Только ' + whenTxt(9, 18, 'wd') : 'Некого')
   ]);
   return h;
 }
@@ -870,43 +930,65 @@ TABS.work = { ic: '💼', n: 'Работа', from: 2, to: 5, view: workView };
 
 /* ---------- УЧЁБА ---------- */
 const examNeed = () => EXAM_STEP * (S.edu.exams + 1);
-function studyGain(base) { return base * (0.5 + 0.5 * (S.energy + S.mood) / 200); }
+function studyGain(base) { return base * (0.5 + 0.5 * (S.energy + S.mood) / 200) * (S.major === 'ped' ? 1.2 : 1); }
 function studyView() {
   let h = '';
   const A = [];
   if (S.stage === 2) {
     h += box('<b>🌙 Вечерняя школа</b><div class="muted">Аттестат: ' + Math.floor(S.edu.school) + '/' + SCHOOL_PTS + ' баллов. Без него дальше не пустят.</div>');
-    A.push(B('📚', 'Вечерние занятия', '3 ч + дорога', () => {
+    A.push(B('📚', 'Вечерние занятия', '3 ч + дорога · ' + whenTxt(17, 20, 'wd'), () => {
       if (!tick(commute(), 'out')) return; if (!tick(3, 'out')) return;
       const g = studyGain(3); S.edu.school = Math.min(SCHOOL_PTS, S.edu.school + g);
-      enUp(-8); moodUp(-5); S.did.study = 1; say('📚 Урок усвоен: +' + g.toFixed(1) + ' балла.', 'good');
+      enUp(-8); moodUp(-5); S.did.study = 1; logWork(commute() + 3); say('📚 Урок усвоен: +' + g.toFixed(1) + ' балла.', 'good');
       if (S.edu.school >= SCHOOL_PTS) say('🎓 Аттестат получен!', 'good');
-    }, !S.did.study && S.edu.school < SCHOOL_PTS && S.energy >= 20, S.edu.school >= SCHOOL_PTS ? 'Аттестат уже есть' : S.did.study ? 'Сегодня уже ходил' : 'Нет сил'));
+    }, !S.did.study && S.edu.school < SCHOOL_PTS && S.energy >= 20 && whenOk(17, 20, 'wd'), S.edu.school >= SCHOOL_PTS ? 'Аттестат уже есть' : S.did.study ? 'Сегодня уже ходил' : S.energy < 20 ? 'Нет сил' : 'Старт ' + whenTxt(17, 20, 'wd')));
   } else if (S.stage === 3) {
     h += box('<b>🏫 ' + MAJ().ic + ' ' + MAJ().n + '</b><div class="muted">Баллы: ' + Math.floor(S.edu.uni) + '/' + UNI_PTS + ' · сессий сдано: ' + S.edu.exams + '/4' + (S.edu.uni >= examNeed() && S.edu.exams < 4 ? ' · пора на сессию!' : '') + '</div>');
     const cap = () => Math.min(UNI_PTS, examNeed());
-    A.push(B('🏫', 'Лекции', '4 ч + дорога', () => {
+    A.push(B('🏫', 'Лекции', '4 ч + дорога · ' + whenTxt(8, 14, 'wd'), () => {
       if (!tick(commute(), 'out')) return; if (!tick(4, 'out')) return;
-      const g = studyGain(3); S.edu.uni = Math.min(cap(), S.edu.uni + g); enUp(-10); moodUp(-6); S.did.lect = 1; say('🏫 Лекции: +' + g.toFixed(1) + ' балла.', 'good');
-    }, !S.did.lect && S.edu.uni < cap() && S.energy >= 20, S.edu.uni >= cap() ? 'Сначала сессия' : S.did.lect ? 'Сегодня уже' : 'Нет сил'));
+      const g = studyGain(3); S.edu.uni = Math.min(cap(), S.edu.uni + g); enUp(-10); moodUp(-6); S.did.lect = 1; logWork(commute() + 4); say('🏫 Лекции: +' + g.toFixed(1) + ' балла.', 'good');
+    }, !S.did.lect && S.edu.uni < cap() && S.energy >= 20 && whenOk(8, 14, 'wd'), S.edu.uni >= cap() ? 'Сначала сессия' : S.did.lect ? 'Сегодня уже' : S.energy < 20 ? 'Нет сил' : 'Старт ' + whenTxt(8, 14, 'wd')));
     A.push(B('📖', 'Самоподготовка', '3 ч дома', () => {
       if (!tick(3, 'home')) return;
-      const g = studyGain(2.5); S.edu.uni = Math.min(cap(), S.edu.uni + g); enUp(-8); moodUp(-4); S.did.self = 1; say('📖 Подготовка: +' + g.toFixed(1) + ' балла.', 'good');
+      const g = studyGain(2.5); S.edu.uni = Math.min(cap(), S.edu.uni + g); enUp(-8); moodUp(-4); S.did.self = 1; logWork(3); say('📖 Подготовка: +' + g.toFixed(1) + ' балла.', 'good');
     }, !S.did.self && S.edu.uni < cap() && S.energy >= 20, S.edu.uni >= cap() ? 'Сначала сессия' : S.did.self ? 'Сегодня уже' : 'Нет сил'));
-    A.push(B('📝', 'Сдать сессию', '2 ч, шанс от сил и настроения', () => {
+    A.push(B('🔁', 'Сменить специальность', mny(10000) + ', минус половина баллов, ' + whenTxt(9, 18, 'wd'), () => { M.fn = () => majorModal('switch'); }, whenOk(9, 18, 'wd') && rub() >= 10000, !whenOk(9, 18, 'wd') ? 'Деканат ' + whenTxt(9, 18, 'wd') : 'Нужно 10 тыс'));
+    A.push(B('📝', 'Сдать сессию', '2 ч, ' + whenTxt(9, 16, 'wd') + ', шанс от сил и настроения', () => {
       if (!tick(commute() + 2, 'out')) return;
       S.did.exam = 1;
-      const p = clamp(0.4 + 0.4 * S.energy / 100 + 0.2 * S.mood / 100, 0, 0.95);
+      const p = clamp(0.4 + 0.4 * S.energy / 100 + 0.2 * S.mood / 100 - MAJ().diff, 0, 0.95);
       if (Math.random() < p) { S.edu.exams++; moodUp(8); say('📝 Сессия сдана! (' + S.edu.exams + '/4)', 'good'); note('success'); }
       else { moodUp(-8); say('📝 Завал. Пересдача завтра.', 'bad'); }
-    }, !S.did.exam && S.edu.uni >= examNeed() && S.edu.exams < 4, S.did.exam ? 'Пересдача завтра' : S.edu.exams >= 4 ? 'Все сессии сданы' : 'Не хватает баллов'));
+    }, !S.did.exam && S.edu.uni >= examNeed() && S.edu.exams < 4 && whenOk(9, 16, 'wd'), S.did.exam ? 'Пересдача завтра' : S.edu.exams >= 4 ? 'Все сессии сданы' : S.edu.uni < examNeed() ? 'Не хватает баллов' : 'Сессия ' + whenTxt(9, 16, 'wd')));
   } else if (S.stage === 4) {
     h += box('<b>🎓 Повышение квалификации</b><div class="muted">Курсы ускоряют карьеру. Иностранный вуз (MBA) нужен для этапа руководителя.</div>');
-    A.push(B('🧠', 'Курсы', '3 ч, ' + mny(15000) + ', +3 опыта', () => {
+    A.push(B('🧠', 'Курсы', '3 ч, ' + mny(15000) + ', +3 опыта · ' + whenTxt(17, 20, 'wd'), () => {
       if (!pay2(15000)) return; if (!tick(commute() + 3, 'out')) return;
       S.jobXp += 3; enUp(-6); moodUp(-3); S.did.course = 1; say('🧠 Курсы пройдены: +3 к опыту.', 'good');
       if (S.jobLvl < 2 && S.jobXp >= CAREER_XP[S.jobLvl + 1]) { S.jobLvl++; say('🎉 Повышение: ' + MAJ().titles[S.jobLvl] + '!', 'good'); }
-    }, !S.did.course && rub() >= 15000 && S.job, !S.job ? 'Нужна работа' : S.did.course ? 'Сегодня уже' : 'Нужно 15 тыс'));
+    }, !S.did.course && rub() >= 15000 && S.job && S.jobLvl < 2 && whenOk(17, 20, 'wd'), !S.job ? 'Нужна работа' : S.jobLvl >= 2 ? 'Высший уровень' : S.did.course ? 'Сегодня уже' : rub() < 15000 ? 'Нужно 15 тыс' : 'Старт ' + whenTxt(17, 20, 'wd')));
+    h += grid(A.splice(0));
+    h += sec('Переподготовка (смена профессии)');
+    const R = S.retr || { to: null, n: 0 };
+    if (!R.to) {
+      A.push(B('🧭', 'Начать переподготовку', mny(50000) + ', 10 занятий + аттестация', () => { M.fn = () => majorModal('retrain'); }, S.job && whenOk(9, 18, 'wd') && rub() >= 50000, !S.job ? 'Нужна работа' : rub() < 50000 ? 'Нужно 50 тыс' : 'Только ' + whenTxt(9, 18, 'wd')));
+    } else {
+      const tm = MAJORS.find(x => x.id === R.to);
+      h += box('Программа: <b>' + tm.ic + ' ' + tm.n + '</b> · занятий ' + R.n + '/10' + (R.n >= 10 ? ' · осталась аттестация' : ''));
+      A.push(B('📓', 'Занятие переподготовки', '3 ч, ' + mny(15000) + ', ' + whenTxt(18, 21, 'wd'), () => {
+        if (!pay2(15000)) return; if (!tick(commute() + 3, 'out')) return; R.n++; S.did.retr = 1; moodUp(-3); enUp(-6); logWork(commute() + 3); say('📓 Занятие переподготовки (' + R.n + '/10).', 'good');
+      }, R.n < 10 && !S.did.retr && whenOk(18, 21, 'wd') && rub() >= 15000 && canWork(commute() + 3), R.n >= 10 ? 'Занятия пройдены' : S.did.retr ? 'Сегодня уже' : rub() < 15000 ? 'Нужно 15 тыс' : 'Вечер ' + whenTxt(18, 21, 'wd')));
+      A.push(B('📜', 'Аттестация', mny(100000) + ', 2 ч, ' + whenTxt(10, 16, 'wd'), () => {
+        if (!pay2(100000)) return; if (!tick(2, 'out')) return; S.did.retrx = 1;
+        if (Math.random() < clamp(0.5 + 0.4 * S.energy / 100 - tm.diff, 0, 0.95)) {
+          S.major = R.to; S.jobLvl = Math.max(0, S.jobLvl - 1); S.jobXp = Math.max(CAREER_XP[S.jobLvl], Math.floor(S.jobXp * 0.4)); S.retr = { to: null, n: 0 };
+          say('📜 Переподготовка завершена: ' + tm.n + '. Новая должность: ' + tm.titles[S.jobLvl] + '.', 'good'); note('success');
+        } else say('📜 Аттестация провалена. Попробуй завтра.', 'bad');
+      }, R.n >= 10 && !S.did.retrx && whenOk(10, 16, 'wd') && rub() >= 100000, R.n < 10 ? 'Сначала занятия' : S.did.retrx ? 'Сегодня уже' : rub() < 100000 ? 'Нужно 100 тыс' : 'Только ' + whenTxt(10, 16, 'wd')));
+      A.push(B('❌', 'Отказаться от программы', 'взносы не возвращаются', () => { S.retr = { to: null, n: 0 }; say('Бросил переподготовку.'); }));
+    }
+    h += grid(A.splice(0));
     h += sec('Иностранный вуз (MBA)');
     const visa = S.edu.visa;
     if (S.mba) h += box('✅ MBA получен. Зарплата +25%.');
@@ -939,7 +1021,8 @@ function garageView() {
   let h = box('<b>' + cu.ic + ' ' + cu.n + '</b><div class="muted">Дорога к работе и учёбе: ' + cu.c + ' ч. Содержание ' + mny(cu.up || 0) + '/день. При покупке нового старый уходит за 50%.</div>');
   h += grid(TRANS.map((t, i) => ({ t, i })).filter(x => x.i > S.transport && (x.t.min || 2) <= S.stage).map(x => {
     const cur = x.t.cur || 'RUB';
-    return B(x.t.ic, x.t.n, mny(x.t.price, cur) + ' · дорога ' + x.t.c + ' ч', () => buyTrans(x.i), S.cash[cur] >= x.t.price, 'Нужно ' + mny(x.t.price, cur));
+    const wo = whenOk(9, 20, 'sixd');
+    return B(x.t.ic, x.t.n, mny(x.t.price, cur) + ' · дорога ' + x.t.c + ' ч', () => buyTrans(x.i), S.cash[cur] >= x.t.price && wo, !wo ? 'Салон ' + whenTxt(9, 20, 'sixd') : 'Нужно ' + mny(x.t.price, cur));
   }));
   return h;
 }
@@ -954,10 +1037,21 @@ GOALS[2] = () => ({
   btn: '🎓 Поступить в университет (15 000 ₽)', can: S.edu.school >= SCHOOL_PTS && rub() >= 15000,
   go() { pay(15000); S.housing = 2; S.arrears = 0; setStage(3); M.fn = majorModal; }
 });
-function majorModal() {
-  return '<h2>🎓 Выбери специальность</h2><p>От неё зависит зарплата и характер работы.</p>' + MAJORS.map(m =>
-    '<div class="item"><span class="ic">' + m.ic + '</span><div class="tx">' + m.n + '<small>зарплата ×' + m.mult + ', стресс ' + (m.mo > 10 ? 'высокий' : m.mo > 8 ? 'средний' : 'низкий') + '</small></div>' +
-    mini('Выбрать', () => { S.major = m.id; say('Специальность: ' + m.n + '.', 'good'); M.fn = () => stageModal(3); }) + '</div>').join('');
+function majorModal(mode = 'start') {
+  const head = mode === 'start' ? '<h2>🎓 Выбери специальность</h2><p>У каждой свой график, зарплата, стресс и перк. Потом её можно сменить, но это стоит времени и денег.</p>'
+    : mode === 'switch' ? '<h2>🔁 Сменить специальность</h2><p>Стоит ' + mny(10000) + ', теряешь половину накопленных баллов.</p>'
+    : '<h2>🧭 Переподготовка</h2><p>Программа: взнос ' + mny(50000) + ', 10 вечерних занятий по ' + mny(15000) + ' и аттестация за ' + mny(100000) + '. Уровень понизится на ступень, опыт сохранится на 40%.</p>';
+  return head + MAJORS.map(m => {
+    const cur = m.id === S.major;
+    const label = cur ? 'Текущая' : mode === 'start' ? 'Выбрать' : mode === 'switch' ? 'Сменить' : 'Начать';
+    const ok = !cur && (mode === 'start' || (mode === 'switch' && rub() >= 10000 && whenOk(9, 18, 'wd')) || (mode === 'retrain' && rub() >= 50000 && whenOk(9, 18, 'wd')));
+    return '<div class="item"><span class="ic">' + m.ic + '</span><div class="tx">' + m.n + '<small>зарплата ×' + m.mult + ', ' + m.h + ' ч, стресс ' + (m.mo >= 11 ? 'высокий' : m.mo >= 8 ? 'средний' : 'низкий') + ', сессия ' + (m.diff >= 0.08 ? 'тяжёлая' : m.diff >= 0.04 ? 'средняя' : 'лёгкая') + '<br>' + m.perk + '</small></div>' +
+      mini(label, () => {
+        if (mode === 'start') { S.major = m.id; say('Специальность: ' + m.n + '.', 'good'); M.fn = () => stageModal(3); }
+        else if (mode === 'switch') { if (!pay2(10000)) return; S.major = m.id; S.edu.uni = Math.floor(S.edu.uni * 0.5); S.edu.exams = Math.min(S.edu.exams, Math.floor(S.edu.uni / EXAM_STEP)); say('🔁 Новая специальность: ' + m.n + '. Баллы пересчитаны.', 'good'); M.fn = null; }
+        else { if (!pay2(50000)) return; S.retr = { to: m.id, n: 0 }; say('🧭 Записался на переподготовку: ' + m.n + '.', 'good'); M.fn = null; }
+      }, ok) + '</div>';
+  }).join('') + (mode === 'start' ? '' : closeBtn());
 }
 GOALS[3] = () => ({
   items: [
@@ -976,10 +1070,12 @@ GOALS[4] = () => ({
   go() { S.team = 0; S.perf = 50; S.lowPerf = 0; setStage(5); }
 });
 GOALS[5] = () => ({
-  items: [{ t: 'Капитал для бизнеса', cur: netWorth(), need: 4e6, money: 1 }],
-  btn: '🏪 Открыть своё дело (3 млн ₽)', can: netWorth() >= 4e6 && rub() >= 3e6,
-  go() { pay(3e6); S.biz = { units: [0], brand: 0, sup: 1, mgr: false, neglect: 0, crisis: 0, month: 0 }; S.team = 0; setStage(6); }
+  items: [{ t: 'Капитал для бизнеса', cur: netWorth(), need: 5e6, money: 1 }],
+  btn: '🏪 Открыть своё дело (3 млн ₽)', can: netWorth() >= 5e6 && rub() >= 3e6,
+  go() { pay(3e6); S.biz = { units: [0], brand: 0, sup: 1, mgr: false, dir: 0, susp: 0, neglect: 0, crisis: 0, month: 0 }; S.team = 0; setStage(6); }
 });
+
+DAILY.push(() => { if (S.major === 'agro' && S.stage >= 4 && S.stage <= 9) earn(2000 * Math.pow(2.2, S.stage - 4)); });
 
 /* --- 05_bank.js --- */
 /* ============ БАНК, ОБМЕННИК, БИРЖА, НЕДВИЖИМОСТЬ ============ */
@@ -1007,10 +1103,10 @@ DAILY.push(() => {
   if (shock && S.stage >= 4) say(sgn > 0 ? '💱 Рубль обвалился: валюта резко дорожает!' : '💱 Рубль укрепился: валюта дешевеет.', sgn > 0 ? 'bad' : 'good');
 });
 DAILY.push(() => {
-  if (S.deposit > 0) S.deposit *= 1 + 0.16 / 365;
+  if (S.deposit > 0) S.deposit *= 1 + (S.major === 'eco' ? 0.2 : 0.16) / 365;
   if (S.debt > 0) {
     if (S.stage < 4) { const r = Math.min(S.debt, S.cash.RUB); S.cash.RUB -= r; S.debt -= r; }
-    else S.debt *= 1 + 0.2 / 365;
+    else S.debt *= 1 + (S.major === 'eco' ? 0.17 : 0.2) / 365;
   }
 });
 DAILY.push(() => {
@@ -1034,38 +1130,56 @@ DAILY.push(() => {
 });
 
 /* ---------- обменник ---------- */
+const fxSpread = () => S.major === 'eco' ? 0.01 : 0.015;
 function buyFx(c, pct) {
   const spend = rub() * pct; if (spend < 1) return toast('Нет рублей');
-  const units = spend / (S.fx.r[c] * 1.015);
+  const units = spend / (S.fx.r[c] * (1 + fxSpread()));
   S.cash.RUB -= spend; S.cash[c] += units;
   say('💱 Купил ' + units.toFixed(0) + ' ' + SYM[c] + ' за ' + mny(spend) + '.');
 }
 function sellFx(c, pct) {
   const units = S.cash[c] * pct; if (units <= 0) return toast('Нечего продавать');
-  const got = units * S.fx.r[c] * 0.985;
+  const got = units * S.fx.r[c] * (1 - fxSpread());
   S.cash[c] -= units; S.cash.RUB += got;
   say('💱 Продал ' + units.toFixed(0) + ' ' + SYM[c] + ' за ' + mny(got) + '.');
 }
 const CUR_NAMES = { USD: 'Доллар', EUR: 'Евро', CNY: 'Юань' };
 function bankView() {
-  let h = box('<b>🏦 Банк и обменник</b><div class="muted">Курс купли на 1,5% дороже, продажи на 1,5% дешевле. Курс скачет каждый день, иногда резко.</div>');
+  const bo = whenOk(9, 18, 'wd'), bw = 'Банк ' + whenTxt(9, 18, 'wd');
+  let h = box('<b>🏦 Банк и обменник</b><div class="muted">Курс купли дороже, продажи дешевле на ' + (fxSpread() * 100).toString().replace('.', ',') + '%. Курс скачет каждый день, иногда резко.<br>Часы работы: ' + whenTxt(9, 18, 'wd') + (bo ? ' (открыто)' : ' (закрыто)') + '.</div>');
   h += sec('Валюта');
   for (const c of ['USD', 'EUR', 'CNY']) {
     h += '<div class="row2"><div class="nm"><b>' + CUR_NAMES[c] + ' ' + SYM[c] + '</b> ' + S.fx.r[c].toFixed(2) + ' ₽ ' + pctTxt(S.fx.d[c]) + '<small>у тебя: ' + S.cash[c].toFixed(0) + ' ' + SYM[c] + '</small></div>' + spark(S.fx.h[c]) +
-      '<div class="btns">' + mini('Купить 25%', () => buyFx(c, 0.25), rub() > 1) + mini('Купить всё', () => buyFx(c, 1), rub() > 1) + mini('Продать 50%', () => sellFx(c, 0.5), S.cash[c] > 0) + mini('Продать всё', () => sellFx(c, 1), S.cash[c] > 0) + '</div></div>';
+      '<div class="btns">' + mini('Купить 25%', () => buyFx(c, 0.25), rub() > 1 && bo) + mini('Купить всё', () => buyFx(c, 1), rub() > 1 && bo) + mini('Продать 50%', () => sellFx(c, 0.5), S.cash[c] > 0 && bo) + mini('Продать всё', () => sellFx(c, 1), S.cash[c] > 0 && bo) + '</div></div>';
   }
-  h += sec('Вклад (16% годовых)');
+  h += sec('Вклад (' + (S.major === 'eco' ? 20 : 16) + '% годовых)');
   h += '<div class="row2"><div class="nm">На вкладе: <b>' + mny(S.deposit) + '</b><small>проценты копятся каждый день</small></div><div class="btns">' +
-    mini('Положить 50%', () => { const x = rub() * 0.5; S.cash.RUB -= x; S.deposit += x; say('Положил на вклад ' + mny(x) + '.'); }, rub() > 1) +
-    mini('Положить всё', () => { S.deposit += rub(); S.cash.RUB = 0; say('Всё на вклад.'); }, rub() > 1) +
-    mini('Снять всё', () => { S.cash.RUB += S.deposit; S.deposit = 0; say('Снял вклад.'); }, S.deposit > 1) + '</div></div>';
-  h += sec('Кредит (20% годовых)');
+    mini('Положить 50%', () => { const x = rub() * 0.5; S.cash.RUB -= x; S.deposit += x; say('Положил на вклад ' + mny(x) + '.'); }, rub() > 1 && bo) +
+    mini('Положить всё', () => { S.deposit += rub(); S.cash.RUB = 0; say('Всё на вклад.'); }, rub() > 1 && bo) +
+    mini('Снять всё', () => { S.cash.RUB += S.deposit; S.deposit = 0; say('Снял вклад.'); }, S.deposit > 1 && bo) + '</div></div>';
+  h += sec('Кредит (' + (S.major === 'eco' ? 17 : 20) + '% годовых)');
   const lim = Math.max(0, Math.max(50000, netWorth() * 0.5) - S.debt);
   h += '<div class="row2"><div class="nm">Долг: <b class="' + (S.debt > 0 ? 'dn' : '') + '">' + mny(S.debt) + '</b><small>можно взять ещё: ' + mny(lim) + '</small></div><div class="btns">' +
-    mini('Взять 25%', () => { const x = lim * 0.25; S.debt += x; S.cash.RUB += x; say('Кредит ' + mny(x) + '.'); }, lim > 1000) +
-    mini('Взять всё', () => { S.debt += lim; S.cash.RUB += lim; say('Кредит ' + mny(lim) + '.'); }, lim > 1000) +
-    mini('Погасить 50%', () => { const x = Math.min(S.debt * 0.5, rub()); S.cash.RUB -= x; S.debt -= x; say('Погасил ' + mny(x) + '.'); }, S.debt > 1 && rub() > 1) +
-    mini('Погасить всё', () => { const x = Math.min(S.debt, rub()); S.cash.RUB -= x; S.debt -= x; say('Погасил ' + mny(x) + '.'); }, S.debt > 1 && rub() > 1) + '</div></div>';
+    mini('Взять 25%', () => { const x = lim * 0.25; S.debt += x; S.cash.RUB += x; say('Кредит ' + mny(x) + '.'); }, lim > 1000 && bo) +
+    mini('Взять всё', () => { S.debt += lim; S.cash.RUB += lim; say('Кредит ' + mny(lim) + '.'); }, lim > 1000 && bo) +
+    mini('Погасить 50%', () => { const x = Math.min(S.debt * 0.5, rub()); S.cash.RUB -= x; S.debt -= x; say('Погасил ' + mny(x) + '.'); }, S.debt > 1 && rub() > 1 && bo) +
+    mini('Погасить всё', () => { const x = Math.min(S.debt, rub()); S.cash.RUB -= x; S.debt -= x; say('Погасил ' + mny(x) + '.'); }, S.debt > 1 && rub() > 1 && bo) + '</div></div>';
+  h += brokerBlock();
+  return h;
+}
+function brokerBlock() {
+  if (S.stage < 6 || S.lic.broker >= 4) return '';
+  const n = S.lic.broker, cr = S.sh.crime;
+  let h = sec('Брокерская лицензия (нужна для этапа инвестора)');
+  if (cr) h += box('⛓️ Судимость закрывает лицензию. Её нужно сначала снять во вкладке «Тень».');
+  h += box('Прогресс: ' + (n >= 3 ? 'курсы пройдены, остался экзамен' : 'занятий ' + n + '/3') + '. Курсы по вечерам в будни, экзамен днём в будни.');
+  h += grid([
+    B('📘', 'Курс брокера', '3 ч, 100 тыс, ' + whenTxt(18, 21, 'wd'), () => { if (!pay2(100000)) return; if (!tick(3, 'out')) return; S.lic.broker++; S.did.brk = 1; moodUp(-3); logWork(3); say('📘 Занятие по биржевому делу пройдено (' + S.lic.broker + '/3).', 'good'); }, n < 3 && !S.did.brk && whenOk(18, 21, 'wd') && rub() >= 100000 && canWork(3) && !cr, cr ? 'Судимость' : n >= 3 ? 'Курсы пройдены' : S.did.brk ? 'Сегодня уже' : rub() < 100000 ? 'Нужно 100 тыс' : 'Вечер ' + whenTxt(18, 21, 'wd')),
+    B('📝', 'Сдать экзамен', '2 ч, 200 тыс, ' + whenTxt(10, 16, 'wd'), () => {
+      if (!pay2(200000)) return; if (!tick(2, 'out')) return; S.did.brkx = 1;
+      if (Math.random() < clamp(0.45 + 0.45 * S.energy / 100, 0, 0.95)) { S.lic.broker = 4; say('📜 Лицензия брокера получена!', 'good'); note('success'); } else say('📝 Экзамен провален. Попробуй завтра.', 'bad');
+    }, n === 3 && !S.did.brkx && whenOk(10, 16, 'wd') && rub() >= 200000 && !cr, cr ? 'Судимость' : n < 3 ? 'Сначала курсы' : S.did.brkx ? 'Сегодня уже' : rub() < 200000 ? 'Нужно 200 тыс' : 'Экзамен ' + whenTxt(10, 16, 'wd'))
+  ]);
   return h;
 }
 TABS.bank = { ic: '🏦', n: 'Банк', from: 4, to: 10, view: bankView };
@@ -1081,19 +1195,20 @@ function sellStock(id, pct) {
   S.cash.RUB += q * o.p * 0.997; o.q -= q; say('📉 Продал ' + q + ' акций ' + id + '.');
 }
 function investView() {
-  let h = box('<b>📈 Биржа</b><div class="muted">Комиссия 0,3%. Новости двигают рынок. Диверсифицируй портфель.</div>');
+  const so = whenOk(10, 18, 'wd'), eo = whenOk(10, 19, 'sixd');
+  let h = box('<b>📈 Биржа</b><div class="muted">Комиссия 0,3%. Новости двигают рынок. Диверсифицируй портфель.<br>Торги: ' + whenTxt(10, 18, 'wd') + (so ? ' (идут)' : ' (закрыто)') + '.</div>');
   let tot = 0;
   STOCKS.forEach(s => {
     const o = S.stk[s.id], prev = o.h.length > 1 ? o.h[o.h.length - 2] : o.p, d = o.p / prev - 1; tot += o.q * o.p;
     h += '<div class="row2"><div class="nm"><b>' + s.n + '</b> ' + o.p.toFixed(1) + ' ₽ ' + pctTxt(d) + '<small>' + o.q + ' шт = ' + mny(o.q * o.p) + '</small></div>' + spark(o.h, 70) +
-      '<div class="btns">' + mini('Купить 25%', () => buyStock(s.id, 0.25), rub() >= o.p) + mini('Продать 50%', () => sellStock(s.id, 0.5), o.q > 0) + mini('Всё', () => sellStock(s.id, 1), o.q > 0) + '</div></div>';
+      '<div class="btns">' + mini('Купить 25%', () => buyStock(s.id, 0.25), rub() >= o.p && so) + mini('Продать 50%', () => sellStock(s.id, 0.5), o.q > 0 && so) + mini('Всё', () => sellStock(s.id, 1), o.q > 0 && so) + '</div></div>';
   });
   h += box('Портфель: <b>' + mny(tot) + '</b>');
   const e = S.estate;
   h += sec('Недвижимость');
   h += '<div class="row2"><div class="nm"><b>🏢 Коммерческое помещение</b> ' + mny(e.price) + '<small>у тебя ' + e.n + ' шт · аренда ' + mny(e.n * e.price * 0.0035) + '/день</small></div><div class="btns">' +
-    mini('Купить', () => { if (!pay2(e.price * 1.03)) return; e.n++; say('🏢 Купил помещение.', 'good'); }, rub() >= e.price * 1.03) +
-    mini('Продать', () => { e.n--; S.cash.RUB += e.price * 0.97; say('🏢 Продал помещение.'); }, e.n > 0) + '</div></div>';
+    mini('Купить', () => { if (!pay2(e.price * 1.03)) return; e.n++; say('🏢 Купил помещение.', 'good'); }, rub() >= e.price * 1.03 && eo) +
+    mini('Продать', () => { e.n--; S.cash.RUB += e.price * 0.97; say('🏢 Продал помещение.'); }, e.n > 0 && eo) + '</div></div>';
   return h;
 }
 TABS.invest = { ic: '📈', n: 'Биржа', from: 7, to: 10, view: investView };
@@ -1114,6 +1229,8 @@ const drawCard = () => ({ r: rand(1, 13), s: SU[rand(0, 3)] });
 const chipVals = () => [1, 5, 25, 100].map(m => CAS_BASE[S.stage] * m);
 const curBet = () => chipVals()[Math.min(S.chip, 3)];
 const locked = () => S.azart >= 100;
+const casOpen = () => S.stage >= 7 || (S.stage <= 3 ? whenOk(20, 6) : whenOk(18, 6));
+const casTxt = () => S.stage >= 7 ? 'круглосуточно' : S.stage <= 3 ? '20:00-06:00' : '18:00-06:00';
 
 function settle(bet, ret, text, sub) {
   // bet уже списана; ret = сколько вернулось
@@ -1126,6 +1243,7 @@ function settle(bet, ret, text, sub) {
 }
 function startRound() {
   const bet = curBet();
+  if (!casOpen()) { toast('Заведение закрыто. Открыто ' + casTxt() + '.'); return null; }
   if (locked()) { toast('Слишком сильный азарт. Приходи завтра.'); return null; }
   if (rub() < bet) { toast('Не хватает денег на ставку'); return null; }
   if (!tick(0.5, 'home')) return null;
@@ -1186,14 +1304,14 @@ function bjDouble() { const bj = S.cas.bj; if (!pay2(bj.bet)) return; bj.doubled
 const GAMES = [['slots', '🎰', 'Слоты'], ['roulette', '🎡', 'Рулетка'], ['bj', '🃏', 'Блэкджек'], ['dice', '🎲', 'Кости'], ['coin', '🪙', 'Монетка']];
 function casinoView() {
   const bet = curBet();
-  let h = box('<b>🎰 ' + CAS_NAME(S.stage) + '</b><div class="muted">Шанс всегда чуть против тебя. Азарт: <b class="' + (S.azart >= 70 ? 'dn' : '') + '">' + Math.round(S.azart) + '/100</b> · итог за всё время: <span class="' + (S.stats.casinoNet >= 0 ? 'up' : 'dn') + '">' + mny(S.stats.casinoNet) + '</span></div>');
+  let h = box('<b>🎰 ' + CAS_NAME(S.stage) + '</b><div class="muted">Шанс всегда чуть против тебя. Азарт: <b class="' + (S.azart >= 70 ? 'dn' : '') + '">' + Math.round(S.azart) + '/100</b> · итог: <span class="' + (S.stats.casinoNet >= 0 ? 'up' : 'dn') + '">' + mny(S.stats.casinoNet) + '</span><br>Открыто: ' + casTxt() + (casOpen() ? ' (сейчас открыто)' : ' (сейчас закрыто)') + '</div>');
   h += '<div class="chips">' + GAMES.map(g => mini(g[1] + ' ' + g[2], () => { S.game = g[0]; }, true, S.game === g[0] ? 'on' : '')).join('') + '</div>';
   h += '<div class="chips"><span class="muted" style="align-self:center">Ставка:</span>' + chipVals().map((v, i) => mini(fmt(v), () => { S.chip = i; }, true, S.chip === i ? 'on' : '')).join('') + '</div>';
   const bj = S.cas.bj;
   let body = '<div class="res">' + (S.cas.last || '🎲') + '</div><div class="sub">' + (S.cas.sub || '') + '</div>';
   if (S.game === 'bj' && bj) body += '<div style="margin-top:6px;font-size:14px">' + (bj.done ? bj.text : 'Ты: ' + showHand(bj.p) + ' (' + handVal(bj.p) + ')<br>Дилер: ' + showHand(bj.d, true)) + '</div>';
   h += '<div class="cas">' + body + '</div>';
-  const lk = locked(), can = rub() >= bet && !lk, why = lk ? 'Азарт зашкаливает' : 'Нужно ' + mny(bet);
+  const lk = locked(), co = casOpen(), can = rub() >= bet && !lk && co, why = !co ? 'Закрыто, открыто ' + casTxt() : lk ? 'Азарт зашкаливает' : 'Нужно ' + mny(bet);
   const A = [];
   if (S.game === 'slots') A.push(B('🎰', 'Крутить', 'ставка ' + mny(bet), playSlots, can, why, 'big'));
   if (S.game === 'coin') { A.push(B('🦅', 'Орёл', '×1,9', () => playCoin('орёл'), can, why)); A.push(B('🪙', 'Решка', '×1,9', () => playCoin('решка'), can, why)); }
@@ -1219,37 +1337,43 @@ TABS.casino = { ic: '🎰', n: 'Казино', from: 2, to: 10, view: casinoView
 
 /* --- 07_biz.js --- */
 /* ============ ЭТАПЫ 6-8: БИЗНЕС, ИНВЕСТОР, МАГНАТ ============ */
-function bizTotal() { return S.biz.units.reduce((a, l) => a + BIZ[l].cost, 0); }
+const ofc = [9, 18, 'wd'];
+const bizTotal = () => S.biz.units.reduce((a, l) => a + BIZ[l].cost, 0);
+const bizCap = () => 2 + 2 * S.biz.dir + (S.major === 'log' ? 1 : 0);
+const prodUnits = () => [...S.biz.units].sort((a, b) => b - a).slice(0, bizCap());
+const prodTotal = () => prodUnits().reduce((a, l) => a + BIZ[l].cost, 0);
 function bizMult() {
   const b = S.biz, sat = 1 / (1 + bizTotal() / 3e9);
-  return SUPS[b.sup].m * (1 + b.brand / 200) * sat * (b.crisis > 0 ? 0.6 : 1) * (b.mgr ? 1 : Math.max(0.4, 1 - 0.1 * b.neglect));
+  const att = b.mgr ? Math.max(0.6, 1 - 0.05 * b.neglect) : Math.max(0.3, 1 - 0.12 * b.neglect);
+  return SUPS[b.sup].m * (1 + b.brand / 200) * sat * (b.crisis > 0 ? 0.6 : 1) * att * (b.susp > 0 ? 0 : 1);
 }
-const bizGross = () => bizTotal() * 0.08 * bizMult();
-const bizNet = () => bizGross() * (b => b.mgr ? 0.7 : 0.85)(S.biz);
+const bizGross = () => prodTotal() * 0.08 * bizMult();
+const bizNet = () => bizGross() * (S.biz.mgr ? 0.7 : 0.85) - S.biz.dir * 25000;
+function forcePay(n, why) {
+  n = Math.round(n * (S.major === 'law' ? 0.6 : 1)); const p = Math.min(rub(), n); S.cash.RUB -= p; if (n > p) S.debt += n - p;
+  say('💸 ' + why + ': -' + mny(n) + '.', 'bad');
+}
 
 DAILY.push(() => {
   const b = S.biz; if (S.stage < 6 || !b.units.length) return;
-  let profit = bizGross();
-  if (b.sup === 0 && Math.random() < 0.1) { profit *= 0.7; say('Дешёвое сырьё испортилось: прибыль упала.', 'bad'); }
-  const net = profit * (b.mgr ? 0.7 : 0.85);
-  earn(net); b.month += net;
-  b.brand = clamp(b.brand - 1 + (b.sup === 2 ? 0.5 : 0)); b.neglect++; if (b.crisis > 0) b.crisis--;
+  const profit = bizGross();
+  const net = profit * (b.mgr ? 0.7 : 0.85) - b.dir * 25000;
+  earn(net); b.month += Math.max(0, net);
+  b.brand = clamp(b.brand - 1 + (b.sup === 2 ? 0.5 : 0)); b.neglect++;
+  if (b.crisis > 0) b.crisis--; if (b.susp > 0) b.susp--;
+  if (b.sup === 0 && Math.random() < 0.1) { earn(-profit * 0.2); say('Дешёвое сырьё испортилось: часть прибыли потеряна.', 'bad'); }
   if (S.day % 30 === 0) {
     const tax = b.month * 0.13; b.month = 0;
-    if (!payBill(tax, 'налоги')) { /* долг записан */ }
-    say('🧾 Налоги за месяц: ' + mny(tax) + '.');
+    payBill(tax, 'налоги'); say('🧾 Налоги за месяц: ' + mny(tax) + '.');
   }
-  const r = Math.random();
-  if (r < 0.03) { const f = Math.min(rub(), net * 3); S.cash.RUB -= f; say('🔍 Налоговая проверка: штраф ' + mny(f) + '.', 'bad'); }
-  else if (r < 0.06) { b.crisis = 5; say('📉 Кризис поставок: прибыль -40% на 5 дней.', 'bad'); }
-  else if (r < 0.09) { b.brand = clamp(b.brand + 20); say('📱 Вирусный пост: бренд вырос!', 'good'); }
+  if (Math.random() < 0.03) { b.brand = clamp(b.brand + 20); say('📱 Вирусный пост: бренд вырос!', 'good'); }
 });
 // банкротство
 DAILY.push(() => {
-  if (S.stage < 6 || S.stage >= 10) return;
+  if (S.stage < 6 || (S.stage >= 10 && S.path !== 'space')) return;
   if (S.debt > 1e6 && S.debt > 0.7 * assetsRub()) {
-    S.biz = { units: [], brand: 0, sup: 1, mgr: false, neglect: 0, crisis: 0, month: 0 };
-    S.cash = { RUB: 0, USD: 0, EUR: 0, CNY: 0 }; S.deposit = 0; S.debt = 0; S.corps = []; S.estate.n = 0;
+    S.biz = { units: [], brand: 0, sup: 1, mgr: false, dir: 0, susp: 0, neglect: 0, crisis: 0, month: 0 };
+    S.cash = { RUB: 0, USD: 0, EUR: 0, CNY: 0 }; S.deposit = 0; S.debt = 0; S.corps = []; S.estate.n = 0; S.pend = []; S.sp = null; S.path = 'pol';
     for (const k in S.stk) S.stk[k].q = 0;
     S.housing = 1; S.transport = Math.min(S.transport, 3); S.job = true; S.jobLvl = 1; S.jobXp = Math.max(S.jobXp, CAREER_XP[1]);
     fall(4, 'Банкротство! Кредиторы забрали бизнес и активы. Ты снова специалист.');
@@ -1257,23 +1381,26 @@ DAILY.push(() => {
 });
 
 function bizView() {
-  const b = S.biz;
-  let h = box('<b>🏭 Твой бизнес</b><div class="muted">Точек: ' + b.units.length + ' · стоимость ' + mny(bizTotal()) + '<br>Прибыль: ~' + mny(bizNet()) + '/день · бренд ' + Math.round(b.brand) + '% · ' + (b.mgr ? '👔 есть управляющий' : 'без присмотра: ' + b.neglect + ' дн.') + (b.crisis > 0 ? '<br>⚠️ Кризис поставок: ещё ' + b.crisis + ' дн.' : '') + '<br>Рынок насыщается: чем больше бизнес, тем ниже отдача.</div>');
+  const b = S.biz, wo = whenOk(9, 18, 'wd'), why = 'Только ' + whenTxt(9, 18, 'wd');
+  const idle = Math.max(0, b.units.length - bizCap());
+  let h = box('<b>🏭 Твой бизнес</b><div class="muted">Точек: ' + b.units.length + ' (в работе ' + Math.min(b.units.length, bizCap()) + ' из мощности ' + bizCap() + ') · стоимость ' + mny(bizTotal()) + '<br>Прибыль: ~' + mny(bizNet()) + '/день · бренд ' + Math.round(b.brand) + '% · ' + (b.mgr ? '👔 управляющий' : 'без управляющего') + ' · без присмотра ' + b.neglect + ' дн.' + (idle ? '<br>⚠️ ' + idle + ' точек простаивают: нужны директора (каждый +2 точки).' : '') + (b.crisis > 0 ? '<br>⚠️ Кризис поставок: ещё ' + b.crisis + ' дн.' : '') + (b.susp > 0 ? '<br>⛔ Лицензия просрочена: работа остановлена на ' + b.susp + ' дн.' : '') + '<br>Офис: ' + whenTxt(9, 18, 'wd') + '. Рынок насыщается: чем больше бизнес, тем ниже отдача.</div>');
   const cnt = [0, 0, 0, 0]; b.units.forEach(l => cnt[l]++);
   h += '<div class="chips">' + BIZ.map((x, i) => '<span class="chip">' + x.ic + ' ' + x.n + ': ' + cnt[i] + '</span>').join('') + '</div>';
   const low = b.units.length ? Math.min(...b.units) : 0;
-  const adv = Math.max(100000, bizGross() * 3), mgrCost = Math.max(500000, bizGross() * 10);
+  const adv = Math.round(Math.max(100000, bizGross() * 3) * (S.major === 'des' ? 0.7 : 1)), mgrCost = Math.max(500000, bizGross() * 10), dirCost = 1.5e6 * (1 + 1.5 * b.dir);
+  const upC = low < 3 ? BIZ[low + 1].cost - BIZ[low].cost * 0.5 : 0;
   h += grid([
-    B('🛠️', 'Управлять', '2 ч, сбросить запущенность', () => { if (!tick(2, 'out')) return; b.neglect = 0; b.brand = clamp(b.brand + 3); S.did.biz = 1; say('Объехал точки, навёл порядок.', 'good'); }, !S.did.biz, 'Сегодня уже'),
-    B('📣', 'Реклама', mny(adv) + ', бренд +15', () => { if (!pay2(adv)) return; b.brand = clamp(b.brand + 15); say('📣 Рекламная кампания запущена.', 'good'); }, rub() >= adv, 'Нужно ' + mny(adv)),
-    B('👔', b.mgr ? 'Управляющий нанят' : 'Нанять управляющего', b.mgr ? '' : mny(mgrCost) + ', 15% прибыли', () => { if (!pay2(mgrCost)) return; b.mgr = true; say('👔 Управляющий взял бизнес на себя.', 'good'); }, !b.mgr && rub() >= mgrCost, b.mgr ? 'Уже есть' : 'Нужно ' + mny(mgrCost)),
-    B('⬆️', 'Расширить точку', b.units.length && low < 3 ? BIZ[low].n + ' → ' + BIZ[low + 1].n + ', ' + mny(BIZ[low + 1].cost - BIZ[low].cost * 0.5) : '', () => { const c = BIZ[low + 1].cost - BIZ[low].cost * 0.5; if (!pay2(c)) return; b.units[b.units.indexOf(low)]++; say('⬆️ Точка расширена.', 'good'); note('success'); }, b.units.length > 0 && low < 3 && rub() >= BIZ[low + 1].cost - BIZ[low].cost * 0.5, 'Не хватает денег')
+    B('🛠️', 'Управлять', '2 ч, обход точек, ' + whenTxt(9, 20, 'sixd'), () => { if (!tick(2, 'out')) return; b.neglect = 0; b.brand = clamp(b.brand + 3); S.did.biz = 1; logWork(2); say('Объехал точки, навёл порядок.', 'good'); }, !S.did.biz && whenOk(9, 20, 'sixd') && canWork(2), S.did.biz ? 'Сегодня уже' : 'Только ' + whenTxt(9, 20, 'sixd')),
+    B('📣', 'Реклама', mny(adv) + ', бренд +15', () => { if (!pay2(adv)) return; b.brand = clamp(b.brand + (S.major === 'des' ? 20 : 15)); say('📣 Рекламная кампания запущена.', 'good'); }, rub() >= adv && wo, !wo ? why : 'Нужно ' + mny(adv)),
+    B('👔', b.mgr ? 'Управляющий нанят' : 'Нанять управляющего', b.mgr ? '' : mny(mgrCost) + ', 15% прибыли', () => { if (!pay2(mgrCost)) return; b.mgr = true; say('👔 Управляющий взял рутину на себя.', 'good'); }, !b.mgr && rub() >= mgrCost && wo, b.mgr ? 'Уже есть' : !wo ? why : 'Нужно ' + mny(mgrCost)),
+    B('🧑‍💼', 'Нанять директора точек', mny(dirCost) + ', 25 тыс/день, +2 точки', () => { if (!pay2(dirCost)) return; b.dir++; say('🧑‍💼 Новый директор: мощность бизнеса выросла.', 'good'); }, rub() >= dirCost && wo, !wo ? why : 'Нужно ' + mny(dirCost)),
+    B('⬆️', 'Расширить точку', b.units.length && low < 3 ? BIZ[low].n + ' → ' + BIZ[low + 1].n + ', ' + mny(upC) : '', () => { if (!pay2(upC)) return; b.units[b.units.indexOf(low)]++; say('⬆️ Точка расширена.', 'good'); note('success'); }, b.units.length > 0 && low < 3 && rub() >= upC && wo, !wo ? why : 'Не хватает денег')
   ]);
   h += sec('Открыть новую точку');
-  h += grid(BIZ.map((x, i) => B(x.ic, x.n, mny(x.cost), () => { if (!pay2(x.cost)) return; b.units.push(i); say(x.ic + ' Открыл: ' + x.n + '.', 'good'); note('success'); }, rub() >= x.cost, 'Нужно ' + mny(x.cost))));
+  h += grid(BIZ.map((x, i) => B(x.ic, x.n, mny(x.cost), () => { if (!pay2(x.cost)) return; b.units.push(i); say(x.ic + ' Открыл: ' + x.n + '.', 'good'); note('success'); }, rub() >= x.cost && wo, !wo ? why : 'Нужно ' + mny(x.cost))));
   h += sec('Поставщик');
-  h += '<div class="chips">' + SUPS.map((s, i) => mini(s.n, () => { b.sup = i; say('Поставщик: ' + s.n + '.'); }, true, b.sup === i ? 'on' : '')).join('') + '</div><div class="muted">' + SUPS[b.sup].d + '</div>';
-  h += grid([B('⏩', 'Ждать неделю', '7 дней', () => waitDays(7), true, '', 'big')]);
+  h += '<div class="chips">' + SUPS.map((s, i) => mini(s.n, () => { b.sup = i; say('Поставщик: ' + s.n + '.'); }, wo, b.sup === i ? 'on' : '')).join('') + '</div><div class="muted">' + SUPS[b.sup].d + '</div>';
+  h += grid([B('⏭', 'Ждать день', 'в бизнесе каждый день что-то происходит', () => waitDays(1), true, '', 'big')]);
   return h;
 }
 TABS.biz = { ic: '🏪', n: 'Бизнес', from: 6, to: 10, view: bizView };
@@ -1287,43 +1414,205 @@ DAILY.push(() => {
     S.rep = clamp(S.rep + c.rep);
   }
   if (S.scandal > 0) S.scandal--;
-  if (S.corps.length && Math.random() < 0.04) { S.rep = clamp(S.rep - 15); S.scandal = 7; say('📰 Громкий скандал! Репутация -15, доход корпораций вдвое меньше на неделю.', 'bad'); }
-  else if (Math.random() < 0.03) { S.rep = clamp(S.rep + 6); say('🌟 СМИ хвалят твой вклад. Репутация выросла.', 'good'); }
+  if (Math.random() < 0.03) { S.rep = clamp(S.rep + 6); say('🌟 СМИ хвалят твой вклад. Репутация выросла.', 'good'); }
 });
 function empireView() {
-  const nw = netWorth();
-  let h = box('<b>🏛️ Империя</b><div class="muted">Репутация: <b>' + Math.round(S.rep) + '/100</b>' + (S.scandal > 0 ? ' · 🔥 скандал ещё ' + S.scandal + ' дн.' : '') + '<br>Корпораций: ' + S.corps.length + ' · доход ~' + mny(S.corps.reduce((a, id) => { const c = CORPS.find(x => x.id === id); return a + c.price * c.y; }, 0)) + '/день</div>');
-  const charity = Math.max(5e6, nw * 0.005), pr = Math.max(2e6, nw * 0.01);
+  const nw = netWorth(), wo = whenOk(9, 18, 'wd'), why = 'Только ' + whenTxt(9, 18, 'wd');
+  let h = box('<b>🏛️ Империя</b><div class="muted">Репутация: <b>' + Math.round(S.rep) + '/100</b>' + (S.scandal > 0 ? ' · 🔥 скандал ещё ' + S.scandal + ' дн.' : '') + '<br>Корпораций: ' + S.corps.length + ' · доход ~' + mny(S.corps.reduce((a, id) => { const c = CORPS.find(x => x.id === id); return a + c.price * c.y; }, 0)) + '/день · фонд: ' + (S.fund ? 'есть' : 'нет') + '</div>');
+  const charity = Math.max(5e6, nw * 0.005), pr = Math.max(2e6, nw * 0.01), fund = Math.max(20e6, nw * 0.01);
   h += grid([
-    B('🎤', 'Пресс-конференция', '2 ч, репутация +2', () => { if (!tick(2, 'out')) return; S.rep = clamp(S.rep + 2 + (S.corps.includes('media') ? 1 : 0)); S.did.press = 1; say('🎤 Пресс-конференция прошла хорошо.', 'good'); }, !S.did.press, 'Сегодня уже'),
-    B('❤️', 'Благотворительность', mny(charity) + ', репутация +' + Math.round(10 * (1 - S.rep / 120)), () => { if (!pay2(charity)) return; S.rep = clamp(S.rep + 10 * (1 - S.rep / 120)); say('❤️ Пожертвование принято. Репутация растёт.', 'good'); note('success'); }, rub() >= charity, 'Нужно ' + mny(charity)),
-    B('🧯', 'Антикризисный PR', mny(pr) + ', снять скандал', () => { if (!pay2(pr)) return; S.scandal = 0; S.rep = clamp(S.rep + 5); say('🧯 Кризис потушен.', 'good'); }, S.scandal > 0 && rub() >= pr, S.scandal > 0 ? 'Нужно ' + mny(pr) : 'Скандалов нет'),
-    B('⏩', 'Ждать неделю', '7 дней', () => waitDays(7))
+    B('🎤', 'Пресс-конференция', '2 ч, репутация +2, ' + whenTxt(9, 18, 'wd'), () => { if (!tick(2, 'out')) return; S.rep = clamp(S.rep + 2 + (S.corps.includes('media') ? 1 : 0) + (S.major === 'media' ? 1 : 0)); S.did.press = 1; logWork(2); say('🎤 Пресс-конференция прошла хорошо.', 'good'); }, !S.did.press && wo, S.did.press ? 'Сегодня уже' : why),
+    B('❤️', 'Благотворительный вечер', mny(charity) + ', репутация +' + Math.round(10 * (1 - S.rep / 120)) + ', ' + whenTxt(18, 23), () => { if (!pay2(charity)) return; if (!tick(3, 'out')) return; S.rep = clamp(S.rep + 10 * (1 - S.rep / 120)); say('❤️ Вечер собрал деньги и прессу. Репутация растёт.', 'good'); note('success'); }, rub() >= charity && whenOk(18, 23), !whenOk(18, 23) ? 'Только ' + whenTxt(18, 23) : 'Нужно ' + mny(charity)),
+    B('🏛️', S.fund ? 'Фонд основан' : 'Основать фонд', S.fund ? '' : mny(fund) + ', репутация +5', () => { if (!pay2(fund)) return; S.fund = true; S.rep = clamp(S.rep + 5); say('🏛️ Благотворительный фонд основан.', 'good'); note('success'); }, !S.fund && rub() >= fund && wo, S.fund ? 'Уже есть' : !wo ? why : 'Нужно ' + mny(fund)),
+    B('🧯', 'Антикризисный PR', mny(pr) + ', снять скандал', () => { if (!pay2(pr)) return; S.scandal = 0; S.rep = clamp(S.rep + 5); say('🧯 Кризис потушен.', 'good'); }, S.scandal > 0 && rub() >= pr && wo, S.scandal > 0 ? (!wo ? why : 'Нужно ' + mny(pr)) : 'Скандалов нет'),
+    B('⏭', 'Ждать день', '', () => waitDays(1))
   ]);
-  h += sec('Корпорации');
+  h += sec('Корпорации (покупка: ' + whenTxt(9, 18, 'wd') + ')');
   h += CORPS.map(c => {
     const own = S.corps.includes(c.id);
     return '<div class="item"><span class="ic">' + c.ic + '</span><div class="tx">' + c.n + '<small>' + c.note + ' · доход ' + (c.y * 100).toFixed(1) + '%/день' + (c.rep ? ', репутация ' + (c.rep > 0 ? '+' : '') + c.rep + '/день' : '') + '</small></div>' +
-      mini(own ? 'Твоя' : mny(c.price), () => { if (!pay2(c.price)) return; S.corps.push(c.id); say(c.ic + ' Купил: ' + c.n + '.', 'good'); note('success'); }, !own && rub() >= c.price) + '</div>';
+      mini(own ? 'Твоя' : mny(c.price), () => { if (!pay2(c.price)) return; S.corps.push(c.id); say(c.ic + ' Купил: ' + c.n + '.', 'good'); note('success'); }, !own && rub() >= c.price && wo) + '</div>';
   }).join('');
   return h;
 }
 TABS.empire = { ic: '🏛️', n: 'Империя', from: 8, to: 10, view: empireView };
 
-/* ---------- ЦЕЛИ ЭТАПОВ 6-8 ---------- */
-GOALS[6] = () => ({
-  items: [{ t: 'Капитал', cur: netWorth(), need: 15e6, money: 1 }],
-  btn: '📈 Стать инвестором', can: netWorth() >= 15e6, go() { setStage(7); }
+/* ---------- ЦЕЛИ ЭТАПОВ 6-8 (несколько условий) ---------- */
+const stocksHeld = () => Object.values(S.stk).filter(o => o.q > 0).length;
+GOALS[6] = () => {
+  const items = [
+    { t: 'Капитал', cur: netWorth(), need: 12e6, money: 1 },
+    { t: 'Точек', cur: S.biz.units.length, need: 4 },
+    { t: 'Хотя бы одно кафе или выше', done: S.biz.units.some(l => l >= 1) },
+    { t: 'Лицензия брокера', done: S.lic.broker >= 4, v: S.lic.broker >= 4 ? '' : 'курсы в разделе «Банк»' },
+    { t: 'Без долгов', done: S.debt < 1 }
+  ];
+  const can = netWorth() >= 12e6 && S.biz.units.length >= 4 && S.biz.units.some(l => l >= 1) && S.lic.broker >= 4 && S.debt < 1;
+  return { items, btn: '📈 Стать инвестором', can, go() { setStage(7); } };
+};
+GOALS[7] = () => {
+  const items = [
+    { t: 'Капитал', cur: netWorth(), need: 120e6, money: 1 },
+    { t: 'Разных акций в портфеле', cur: stocksHeld(), need: 3 },
+    { t: 'Помещений в аренде', cur: S.estate.n, need: 2 },
+    { t: 'Репутация', cur: Math.round(S.rep), need: 45 }
+  ];
+  const can = netWorth() >= 120e6 && stocksHeld() >= 3 && S.estate.n >= 2 && S.rep >= 45;
+  return { items, btn: '🏛️ Стать магнатом', can, go() { setStage(8); } };
+};
+GOALS[8] = () => {
+  const items = [
+    { t: 'Капитал', cur: netWorth(), need: 1e9, money: 1 },
+    { t: 'Репутация', cur: Math.round(S.rep), need: 60 },
+    { t: 'Корпораций', cur: S.corps.length, need: 3 },
+    { t: 'Благотворительный фонд', done: S.fund },
+    { t: 'Нет скандала', done: S.scandal === 0 },
+    { t: 'Политика: без судимости', done: !S.sh.crime }
+  ];
+  const can = netWorth() >= 1e9 && S.rep >= 60 && S.corps.length >= 3 && S.fund && S.scandal === 0 && !S.sh.crime;
+  const can2 = netWorth() >= 1e9 && S.corps.length >= 1 && S.rep >= 50;
+  items.push({ t: 'Для космоса хватит: капитал, 1 корпорация, репутация 50', done: can2 });
+  return { items, btn: '🗳️ Уйти в политику', can, go() { S.path = 'pol'; S.pol = { lvl: 0, appr: 50, next: nextSunday(S.day + 20), camp: 0 }; setStage(9); },
+    btn2: '🛰️ Основать космокомпанию', can2, go2() { S.path = 'space'; initSpace(50); setStage(9); } };
+};
+function nextSunday(d) { while ((d - 1) % 7 !== 6) d++; return d; }
+
+/* --- 07_events.js --- */
+/* ============ СРОЧНЫЕ ДЕЛА (этапы 6-9): события с дедлайном ============ */
+const gp = () => Math.max(100000, bizGross());
+const topCorp = () => S.corps.map(id => CORPS.find(c => c.id === id)).sort((a, b) => b.price - a.price)[0];
+const loseCorp = () => { const c = topCorp(); if (c) { S.corps = S.corps.filter(id => id !== c.id); say('📉 Потерял корпорацию: ' + c.n + '.', 'bad'); } };
+
+const EVDEF = {
+  audit: { cd: 18, st: [6, 8], w: 3, dl: 3, ic: '🔍', t: 'Налоговая проверка', cond: () => S.biz.units.length > 0,
+    x: () => 'Инспекторы запросили отчётность по всем точкам.',
+    opts: [
+      { l: 'Нанять юриста', c: () => gp() * 2, when: ofc, run: () => say('🔍 Юрист закрыл вопрос без штрафа.', 'good') },
+      { l: 'Явиться лично', h: 2, when: ofc, run: () => { if (Math.random() < 0.6) say('🔍 Проверка пройдена без замечаний.', 'good'); else forcePay(gp() * 4, 'Штраф по итогам проверки'); } },
+      { l: 'Заплатить штраф сразу', c: () => gp() * 3, run: () => say('🔍 Вопрос закрыт штрафом.') }],
+    fail: () => { forcePay(gp() * 6, 'Штраф за игнор проверки'); S.rep = clamp(S.rep - 3); } },
+  supply: { st: [6, 8], w: 3, dl: 2, ic: '📦', t: 'Поставщик поднял цены', cond: () => S.biz.units.length > 0,
+    x: () => 'Новые условия съедят часть прибыли, если не среагировать.',
+    opts: [
+      { l: 'Принять условия', run: () => { S.biz.crisis = Math.max(S.biz.crisis, 3); say('📦 Условия приняты. Прибыль просядет на 3 дня.'); } },
+      { l: 'Искать другого', h: 3, when: ofc, run: () => { if (Math.random() < 0.55) { S.biz.brand = clamp(S.biz.brand + 5); say('📦 Нашёл поставщика дешевле!', 'good'); } else { S.biz.crisis = Math.max(S.biz.crisis, 4); say('📦 Замену найти не удалось.', 'bad'); } } },
+      { l: 'Зафиксировать цену', c: () => gp() * 3 * (S.major === 'eng' ? 0.5 : 1), when: ofc, run: () => say('📦 Цена зафиксирована.', 'good') }],
+    fail: () => { S.biz.crisis = Math.max(S.biz.crisis, 5); say('📦 Из-за пропущенного письма сорвалась поставка.', 'bad'); } },
+  licence: { cd: 40, st: [6, 8], w: 2, dl: 5, ic: '📜', t: 'Продление лицензии', cond: () => S.biz.units.length > 0,
+    x: () => 'Лицензия на торговлю истекает. Без продления работу остановят.',
+    opts: [{ l: 'Продлить', c: () => 300000 + gp() * 3, when: ofc, run: () => say('📜 Лицензия продлена.', 'good') }],
+    fail: () => { S.biz.susp = 6; say('📜 Лицензия просрочена: бизнес остановлен на 6 дней!', 'bad'); } },
+  breakdown: { st: [6, 8], w: 2, dl: 1, ic: '🛠️', t: 'Поломка оборудования', cond: () => S.biz.units.length > 0,
+    x: () => 'На одной из точек встало оборудование. Решать нужно сегодня или завтра.',
+    opts: [
+      { l: 'Срочный ремонт', c: () => gp() * 1.5 * (S.major === 'eng' ? 0.5 : 1), run: () => say('🛠️ Ремонт сделан.', 'good') },
+      { l: 'Починить своими силами', h: 4, run: () => { if (Math.random() < 0.5) say('🛠️ Починил сам. Руки помнят.', 'good'); else { S.biz.crisis = Math.max(S.biz.crisis, 4); say('🛠️ Не вышло, простой.', 'bad'); } } }],
+    fail: () => { S.biz.crisis = Math.max(S.biz.crisis, 7); say('🛠️ Простой оборудования затянулся.', 'bad'); } },
+  strike: { cd: 20, st: [6, 8], w: 2, dl: 2, ic: '✊', t: 'Забастовка персонала', cond: () => S.biz.units.length >= 3,
+    x: () => 'Сотрудники требуют повысить зарплаты.',
+    opts: [
+      { l: 'Поднять зарплаты', c: () => gp() * 3, run: () => say('✊ Договорились, работа идёт.', 'good') },
+      { l: 'Вести переговоры', h: 2, when: ofc, run: () => { if (Math.random() < 0.5) say('✊ Переговоры удались.', 'good'); else { S.biz.crisis = Math.max(S.biz.crisis, 4); say('✊ Переговоры сорвались.', 'bad'); } } }],
+    fail: () => { S.biz.crisis = Math.max(S.biz.crisis, 6); S.rep = clamp(S.rep - 3); say('✊ Забастовка парализовала работу.', 'bad'); } },
+  offer: { st: [6, 8], w: 2, dl: 3, ic: '🤝', t: 'Конкурент продаёт точку', cond: () => S.biz.units.length > 0,
+    x: () => 'Можно купить готовую точку с дисконтом 40%.',
+    opts: [
+      { l: 'Купить', c: () => BIZ[0].cost * 0.6, when: ofc, run: () => { S.biz.units.push(0); say('🤝 Точка куплена со скидкой.', 'good'); } },
+      { l: 'Отказаться', run: () => say('Отказался от сделки.') }],
+    fail: () => say('🤝 Конкурент нашёл другого покупателя.') },
+  ipo: { st: [7, 8], w: 3, dl: 2, ic: '🚀', t: 'Размещение акций (IPO)', cond: () => S.lic.broker >= 4 && rub() > 1e6,
+    x: () => 'Можно купить акции на 15% дешевле рынка. Окно сделки: будни 10-18.',
+    opts: [
+      { l: 'Участвовать (25% кэша)', c: () => rub() * 0.25, when: [10, 18, 'wd'], run: e => { const id = Math.random() < 0.5 ? 'TSF' : 'KSM', o = S.stk[id], q = Math.floor(e.paid / (o.p * 0.85)); if (q < 1) { earn(e.paid); return; } o.q += q; say('🚀 Получил ' + q + ' акций ' + id + ' с дисконтом.', 'good'); } },
+      { l: 'Пропустить', run: () => say('Пропустил размещение.') }],
+    fail: () => say('🚀 Размещение закрылось без тебя.') },
+  margin: { cd: 15, st: [7, 8], w: 3, dl: 3, ic: '⚠️', t: 'Требование банка', cond: () => S.debt > 1e6,
+    x: () => 'Банк требует вернуть часть долга или обеспечить его.',
+    opts: [
+      { l: 'Вернуть 20% долга', c: () => S.debt * 0.2, run: e => { S.debt = Math.max(0, S.debt - e.paid); say('⚠️ Часть долга возвращена.', 'good'); } },
+      { l: 'Продать акции', when: [10, 18, 'wd'], ok: () => Object.values(S.stk).some(o => o.q > 0), run: () => { let sum = 0; for (const k in S.stk) { const o = S.stk[k], q = Math.floor(o.q * 0.5); sum += q * o.p * 0.997; o.q -= q; } const r = Math.min(S.debt, sum); S.debt -= r; S.cash.RUB += sum - r; say('⚠️ Продал часть акций и закрыл требование.'); } }],
+    fail: () => { let sum = 0; for (const k in S.stk) { sum += S.stk[k].q * S.stk[k].p * 0.92; S.stk[k].q = 0; } const r = Math.min(S.debt, sum); S.debt -= r; S.cash.RUB += sum - r; say('⚠️ Банк принудительно продал твои акции.', 'bad'); } },
+  startup: { st: [7, 8], w: 2, dl: 3, ic: '💡', t: 'Предложение вложиться в стартап', cond: () => rub() > 5e6,
+    x: () => 'Основатель обещает ракету, но шансы невелики.',
+    opts: [
+      { l: 'Вложить 10% кэша', c: () => rub() * 0.1, run: e => { if (Math.random() < 0.25) { earn(e.paid * 4.5); say('💡 Стартап выстрелил! ×4,5 к вложениям.', 'good'); note('success'); } else say('💡 Стартап прогорел.', 'bad'); } },
+      { l: 'Отказаться', run: () => say('Отказался от стартапа.') }],
+    fail: () => say('💡 Предложение ушло другому инвестору.') },
+  presscrisis: { st: [8, 8], w: 3, dl: 2, ic: '📰', t: 'Скандал в прессе', cond: () => S.corps.length > 0 && S.scandal === 0,
+    x: () => 'Журналисты готовят разоблачение о твоих корпорациях.',
+    opts: [
+      { l: 'PR-кампания', c: () => Math.max(2e6, netWorth() * 0.01), when: ofc, run: () => { S.rep = clamp(S.rep + 2); say('📰 Историю удалось смягчить.', 'good'); } },
+      { l: 'Публичные извинения', h: 2, run: () => { S.rep = clamp(S.rep - 2); S.scandal = 3; say('📰 Извинения приняты, но осадок остался.', 'bad'); } }],
+    fail: () => { S.rep = clamp(S.rep - 15); S.scandal = 7; say('📰 Скандал разгорелся! Репутация -15, доход корпораций вдвое меньше на неделю.', 'bad'); } },
+  takeover: { cd: 20, st: [8, 9], w: 2, dl: 3, ic: '🦈', t: 'Враждебное поглощение', cond: () => S.corps.length > 0,
+    x: () => 'Конкуренты скупают долю в твоей крупнейшей корпорации.',
+    opts: [
+      { l: 'Отбиться юристами', c: () => topCorp().price * 0.1, when: ofc, run: () => say('🦈 Атака отбита.', 'good') },
+      { l: 'Переговоры', h: 3, when: ofc, run: () => { if (Math.random() < 0.5) say('🦈 Договорился, поглощения не будет.', 'good'); else loseCorp(); } }],
+    fail: () => loseCorp() },
+  inspect: { cd: 20, st: [8, 9], w: 2, dl: 3, ic: '🕵️', t: 'Проверка корпораций', cond: () => S.corps.length > 0,
+    x: () => 'К тебе пришли с проверкой.',
+    opts: [
+      { l: 'Нанять юристов', c: () => Math.max(1e6, netWorth() * 0.002), when: ofc, run: () => say('🕵️ Юристы всё уладили.', 'good') },
+      { l: 'Дать показания', h: 2, when: ofc, run: () => { if (Math.random() < 0.6) say('🕵️ Показания приняли.', 'good'); else { forcePay(netWorth() * 0.003, 'Штраф'); S.rep = clamp(S.rep - 3); } } }],
+    fail: () => { forcePay(netWorth() * 0.006, 'Штраф за игнор проверки'); S.rep = clamp(S.rep - 8); } },
+  debate: { st: [9, 9], w: 3, dl: 3, ic: '🎙️', t: 'Приглашение на дебаты', cond: () => !!S.pol && S.path !== 'space',
+    x: () => 'Телеканал зовёт на дебаты. Эфир в будни вечером (19-22).',
+    opts: [{ l: 'Участвовать', h: 2, when: [19, 22, 'wd'], run: () => { if (Math.random() < 0.5 + 0.2 * (S.rep - 50) / 50) { S.pol.appr = clamp(S.pol.appr + 8); say('🎙️ Блестящее выступление! Рейтинг +8%.', 'good'); } else { S.pol.appr = clamp(S.pol.appr - 3); say('🎙️ Дебаты прошли неудачно. -3%.', 'bad'); } } }],
+    fail: () => { S.pol.appr = clamp(S.pol.appr - 8); say('🎙️ Пустое кресло в студии. Рейтинг -8%.', 'bad'); } },
+  leak: { st: [9, 9], w: 3, dl: 2, ic: '📰', t: 'Утечка в СМИ', cond: () => !!S.pol && S.path !== 'space',
+    x: () => 'Журналисты публикуют неприятную историю про тебя.',
+    opts: [
+      { l: 'Опровергнуть', h: 2, when: ofc, run: () => { if (Math.random() < 0.55) { S.pol.appr = clamp(S.pol.appr + 3); say('📰 Опровержение сработало.', 'good'); } else { S.pol.appr = clamp(S.pol.appr - 4); say('📰 Опровержение не убедило.', 'bad'); } } },
+      { l: 'Заплатить за тишину', c: () => Math.max(1e6, netWorth() * 0.002) * (S.major === 'media' ? 0.5 : 1), run: () => say('📰 История замята.') },
+      { l: 'Промолчать', run: () => { S.pol.appr = clamp(S.pol.appr - 3); say('📰 Молчание стоило 3% рейтинга.', 'bad'); } }],
+    fail: () => { S.pol.appr = clamp(S.pol.appr - 5); say('📰 Ты не отреагировал, рейтинг -5%.', 'bad'); } },
+  donor: { st: [9, 9], w: 2, dl: 3, ic: '🍷', t: 'Ужин с донорами', cond: () => !!S.pol && S.path !== 'space',
+    x: () => 'Влиятельные бизнесмены готовы поддержать кампанию.',
+    opts: [
+      { l: 'Пойти на ужин', h: 3, when: [18, 23, 'all'], run: () => { S.pol.appr = clamp(S.pol.appr + 4); S.rep = clamp(S.rep - 3); say('🍷 Ужин принёс поддержку, но пошли слухи.'); } },
+      { l: 'Отказаться', run: () => { S.rep = clamp(S.rep + 1); say('Отказался от сомнительных связей.'); } }],
+    fail: () => say('🍷 Приглашение отозвали.') }
+};
+
+const evCost = o => Math.round(o.c() * (S.major === 'law' ? 0.5 : 1));
+function resolveEv(idx, oi) {
+  const e = S.pend[idx], d = EVDEF[e.k], o = d.opts[oi];
+  if (e.k.startsWith('sp_') && !S.sp) { S.pend.splice(idx, 1); return; }
+  if (o.c) { const c = evCost(o); if (!pay2(c)) return; e.paid = c; }
+  if (o.h && !tick(o.h, 'out')) return;
+  S.pend.splice(idx, 1);
+  o.run(e);
+  note('success');
+}
+DAILY.push(() => {
+  if (S.stage < 6 || (S.stage >= 10 && S.path !== 'space')) { S.pend = []; return; }
+  if (!S.sp) S.pend = S.pend.filter(e => !e.k.startsWith('sp_'));
+  for (const e of [...S.pend]) {
+    if (S.day > e.dl) { S.pend = S.pend.filter(x => x !== e); try { EVDEF[e.k].fail(e); } catch (er) { console.error(er); } }
+  }
+  S.cd = S.cd || {};
+  if (S.pend.length < 3 && Math.random() < (S.stage === 6 ? 0.25 : 0.32)) {
+    const pool = Object.keys(EVDEF).filter(k => { const d = EVDEF[k]; return S.stage >= d.st[0] && S.stage <= d.st[1] && (!d.cond || d.cond()) && !S.pend.some(e => e.k === k) && (S.cd[k] || 0) <= S.day; });
+    const sum = pool.reduce((a, k) => a + EVDEF[k].w, 0);
+    let r = Math.random() * sum;
+    for (const k of pool) { r -= EVDEF[k].w; if (r <= 0) { const d = EVDEF[k]; S.pend.push({ k, dl: S.day + d.dl }); S.cd[k] = S.day + (d.cd || 12); say('📬 Срочно: ' + d.t + ' (до дня ' + (S.day + d.dl) + ').', 'bad'); break; } }
+  }
 });
-GOALS[7] = () => ({
-  items: [{ t: 'Капитал', cur: netWorth(), need: 150e6, money: 1 }],
-  btn: '🏛️ Стать магнатом', can: netWorth() >= 150e6, go() { setStage(8); }
-});
-GOALS[8] = () => ({
-  items: [{ t: 'Капитал', cur: netWorth(), need: 1.5e9, money: 1 }, { t: 'Репутация', cur: Math.round(S.rep), need: 60 }],
-  btn: '🗳️ Уйти в политику', can: netWorth() >= 1.5e9 && S.rep >= 60,
-  go() { S.pol = { lvl: 0, appr: 50, next: S.day + 20, camp: 0 }; setStage(9); }
-});
+function pendHTML() {
+  if (S.stage < 6 || (S.stage >= 10 && S.path !== 'space') || !S.pend.length) return '';
+  let h = sec('📬 Срочные дела');
+  S.pend.forEach((e, i) => {
+    const d = EVDEF[e.k], left = e.dl - S.day;
+    h += box('<b>' + d.ic + ' ' + d.t + '</b><div class="muted">' + d.x() + '<br>Решить до дня ' + e.dl + ' (' + (left > 0 ? 'осталось ' + left + ' дн.' : 'последний день') + ')</div>');
+    h += grid(d.opts.map((o, oi) => {
+      const c = o.c ? evCost(o) : 0, wo = !o.when || whenOk(o.when[0], o.when[1], o.when[2]), okc = !o.ok || o.ok(), money = !o.c || rub() >= c;
+      const sub = (c ? mny(c) + ' ' : '') + (o.h ? o.h + ' ч ' : '') + (o.when ? whenTxt(o.when[0], o.when[1], o.when[2]) : '');
+      return B('🔹', o.l, sub, () => resolveEv(i, oi), wo && okc && money, !wo ? 'Окно ' + whenTxt(o.when[0], o.when[1], o.when[2]) : !money ? 'Нужно ' + mny(c) : 'Недоступно');
+    }));
+  });
+  return h;
+}
 
 /* --- 08_politics.js --- */
 /* ============ ЭТАПЫ 9-10: ПОЛИТИКА И ГОСУДАРСТВО ============ */
@@ -1333,61 +1622,64 @@ const POL_STEPS = [
   { n: 'Президентские выборы Республики Аркадия', title: 'Депутат региона', thr: 60, gap: 25 }
 ];
 DAILY.push(() => {
-  if (S.stage !== 9) return;
+  if (S.stage !== 9 || S.path === 'space') return;
   const p = S.pol;
   p.appr = clamp(p.appr - 0.8);
   const r = Math.random();
   if (r < 0.07) { p.appr = clamp(p.appr - 6); say('📰 Журналисты раскопали старую историю. Рейтинг -6.', 'bad'); }
   else if (r < 0.14) { p.appr = clamp(p.appr + 5); say('📰 Твоя инициатива понравилась людям. Рейтинг +5.', 'good'); }
-  if (S.day >= p.next) holdElection();
+  if (S.day >= p.next && wday() === 6) holdElection();
 });
 function holdElection() {
   const p = S.pol, st = POL_STEPS[p.lvl];
   const score = p.appr + rand(-8, 8);
   if (score >= st.thr) {
     p.lvl++; note('success');
-    if (p.lvl >= 3) { enterState(); return; }
-    p.next = S.day + POL_STEPS[p.lvl].gap;
+    if (p.lvl >= 3) { note('success'); M.fn = presidencyModal; return; }
+    p.next = nextSunday(S.day + POL_STEPS[p.lvl].gap);
     say('🗳️ Победа на выборах! Теперь: ' + POL_STEPS[p.lvl].title + '.', 'good');
     M.fn = () => '<h2>🗳️ Победа!</h2><p>' + st.n + ' выиграны. Рейтинг: ' + Math.round(p.appr) + '%.</p><button class="btn" data-close="1">Дальше</button>';
   } else {
-    S.rep = clamp(S.rep - 10); p.appr = Math.max(p.appr, 45); p.next = S.day + 10;
+    S.rep = clamp(S.rep - 10); p.appr = Math.max(p.appr, 45); p.next = nextSunday(S.day + 10);
     say('🗳️ Поражение на выборах (' + Math.round(score) + '% при проходном ' + st.thr + '%). Новая попытка через 10 дней.', 'bad'); note('error');
     M.fn = () => '<h2>🗳️ Поражение</h2><p>Нужно было ' + st.thr + '%, а получилось ' + Math.round(score) + '%. Репутация -10. Следующая попытка через 10 дней.</p><button class="btn" data-close="1">Понял</button>';
   }
 }
 function polView() {
   const p = S.pol, st = POL_STEPS[Math.min(2, p.lvl)], nw = netWorth();
-  const ad = Math.max(1e6, nw * 0.002);
-  let h = box('<b>🗳️ ' + st.title + '</b><div class="muted">Следующее: ' + st.n + ' через ' + Math.max(0, p.next - S.day) + ' дн. · нужно ≥' + st.thr + '%<br>Рейтинг одобрения: <b>' + Math.round(p.appr) + '%</b> · репутация ' + Math.round(S.rep) + '</div>');
+  if (p.lvl >= 3) return box('<b>🗳️ Ты победил на президентских выборах</b><div class="muted">Принять пост главы государства или отказаться от власти и заняться космосом?</div>') + grid([B('👑', 'Принять пост', 'решения-карточки, космическая программа государства', () => enterState(), true, '', 'big'), B('🛰️', 'Отказаться и уйти в космос', 'частная космокомпания, доверие 70', declinePresidency, true, '', 'big')]);
+  const ad = Math.round(Math.max(1e6, nw * 0.002) * (S.major === 'des' ? 0.7 : 1));
+  let h = box('<b>🗳️ ' + st.title + '</b><div class="muted">Следующее: ' + st.n + ' в воскресенье, день ' + p.next + ' (через ' + Math.max(0, p.next - S.day) + ' дн.) · нужно ≥' + st.thr + '%<br>Рейтинг одобрения: <b>' + Math.round(p.appr) + '%</b> · репутация ' + Math.round(S.rep) + '</div>');
+  const mo = whenOk(10, 20, 'we'), dwo = whenOk(19, 22, 'wd'), awo = whenOk(9, 18, 'wd'), gwo = whenOk(18, 23, 'fri-sat');
   h += grid([
-    B('📢', 'Митинг', '3 ч, рейтинг +4..7', () => { if (!tick(3, 'out')) return; p.appr = clamp(p.appr + rand(4, 7)); moodUp(-4); S.did.rally = 1; say('📢 Митинг собрал толпу.', 'good'); }, !S.did.rally && S.energy >= 20, S.did.rally ? 'Сегодня уже' : 'Нет сил'),
-    B('🎙️', 'Дебаты', '2 ч, риск', () => {
-      if (!tick(2, 'out')) return; S.did.debate = 1;
+    B('📢', 'Митинг', '3 ч, +4..7, ' + whenTxt(10, 20, 'we'), () => { if (!tick(3, 'out')) return; p.appr = clamp(p.appr + rand(4, 7) + (S.major === 'media' ? 2 : 0)); moodUp(-4); S.did.rally = 1; logWork(3); say('📢 Митинг собрал толпу.', 'good'); }, !S.did.rally && S.energy >= 20 && mo && canWork(3), S.did.rally ? 'Сегодня уже' : S.energy < 20 ? 'Нет сил' : 'Только ' + whenTxt(10, 20, 'we')),
+    B('🎙️', 'Дебаты в студии', '2 ч, риск, ' + whenTxt(19, 22, 'wd'), () => {
+      if (!tick(2, 'out')) return; S.did.debate = 1; logWork(2);
       if (Math.random() < 0.5 + 0.2 * (S.rep - 50) / 50) { p.appr = clamp(p.appr + 8); say('🎙️ Блестящие дебаты! +8%.', 'good'); } else { p.appr = clamp(p.appr - 3); say('🎙️ Дебаты прошли неудачно. -3%.', 'bad'); }
-    }, !S.did.debate, 'Сегодня уже'),
-    B('📺', 'Реклама', mny(ad) + ', +6%', () => { if (!pay2(ad)) return; p.appr = clamp(p.appr + 6); S.did.ad = 1; say('📺 Рекламная кампания в эфире.', 'good'); }, !S.did.ad && rub() >= ad, S.did.ad ? 'Сегодня уже' : 'Нужно ' + mny(ad)),
-    B('🎭', 'Благотворительный вечер', mny(ad) + ', +4% и репутация', () => { if (!pay2(ad)) return; p.appr = clamp(p.appr + 4); S.rep = clamp(S.rep + 5); S.did.gala = 1; say('🎭 Вечер удался.', 'good'); }, !S.did.gala && rub() >= ad, S.did.gala ? 'Сегодня уже' : 'Нужно ' + mny(ad)),
+    }, !S.did.debate && dwo, S.did.debate ? 'Сегодня уже' : 'Только ' + whenTxt(19, 22, 'wd')),
+    B('📺', 'Реклама', mny(ad) + ', +6%, ' + whenTxt(9, 18, 'wd'), () => { if (!pay2(ad)) return; p.appr = clamp(p.appr + 6); S.did.ad = 1; say('📺 Рекламная кампания в эфире.', 'good'); }, !S.did.ad && rub() >= ad && awo, S.did.ad ? 'Сегодня уже' : !awo ? 'Только ' + whenTxt(9, 18, 'wd') : 'Нужно ' + mny(ad)),
+    B('🎭', 'Благотворительный вечер', mny(ad) + ', +4%, ' + whenTxt(18, 23, 'fri-sat'), () => { if (!pay2(ad)) return; if (!tick(3, 'out')) return; p.appr = clamp(p.appr + 4); S.rep = clamp(S.rep + 5); S.did.gala = 1; say('🎭 Вечер удался.', 'good'); }, !S.did.gala && rub() >= ad && gwo, S.did.gala ? 'Сегодня уже' : !gwo ? 'Только ' + whenTxt(18, 23, 'fri-sat') : 'Нужно ' + mny(ad)),
     B('🗂️', 'Компромат на соперника', 'риск 40%', () => {
       S.did.dirt = 1;
       if (Math.random() < 0.6) { p.appr = clamp(p.appr + 10); say('🗂️ Скандал у соперника. Тебе +10%.', 'good'); } else { p.appr = clamp(p.appr - 10); S.rep = clamp(S.rep - 15); say('🗂️ Компромат слили против тебя. -10% и репутация -15.', 'bad'); }
     }, !S.did.dirt, 'Сегодня уже'),
-    B('⏩', 'Ждать неделю', '7 дней', () => waitDays(7))
+    B('⏭', 'Ждать день', '', () => waitDays(1)),
+    B('🛰️', 'Уйти в космос', 'бросить гонку, основать космокомпанию', () => { M.fn = () => '<h2>🛰️ Уйти из политики?</h2><p>Ты оставляешь выборы и основываешь космическую компанию. Политические связи дадут стартовое доверие инвесторов' + (S.pol.lvl >= 2 ? ' (выше, ведь ты уже региональный депутат)' : '') + '.</p>' + B('🚀', 'Основать компанию', '', switchToSpace, true, '', 'big') + closeBtn(); }, S.stage === 9 && S.path !== 'space')
   ]);
   return h;
 }
-TABS.politics = { ic: '🗳️', n: 'Политика', from: 9, to: 9, view: polView };
+TABS.politics = { ic: '🗳️', n: 'Политика', from: 9, to: 9, path: 'pol', view: polView };
 
 GOALS[9] = () => ({
-  items: [
-    { t: POL_STEPS[Math.min(2, S.pol.lvl)].n, v: 'через ' + Math.max(0, S.pol.next - S.day) + ' дн.' },
+  items: S.pol.lvl >= 3 ? [{ t: 'Президентские выборы выиграны', done: true, v: 'прими решение во вкладке «Политика»' }] : [
+    { t: POL_STEPS[Math.min(2, S.pol.lvl)].n, v: 'воскресенье, день ' + S.pol.next },
     { t: 'Рейтинг одобрения', cur: Math.round(S.pol.appr), need: POL_STEPS[Math.min(2, S.pol.lvl)].thr }
   ]
 });
 
 /* ---------- ГЛАВА ГОСУДАРСТВА ---------- */
 function enterState() {
-  S.st = { treasure: 50, people: 50, army: 50, science: 50, space: S.corps.includes('space') ? 10 : 0, card: null };
+  S.st = { treasure: 50, people: 50, army: 50, science: S.major === 'sci' ? 60 : 50, space: S.corps.includes('space') ? 10 : 0, card: null };
   S.housing = 7;
   setStage(10);
 }
@@ -1399,7 +1691,7 @@ function stateChoose(side) {
   const c = CARDS[S.st.card], ch = c[side], fx = ch[1], sp = ch[2] || 0;
   for (const k in fx) S.st[k] = clamp(S.st[k] + fx[k]);
   S.st.space = clamp(S.st.space + sp, 0, 100);
-  S.st.space = clamp(S.st.space + (0.35 + Math.max(0, (S.st.science - 40) / 22)) * (S.corps.includes('space') ? 1.3 : 1), 0, 100);
+  S.st.space = clamp(S.st.space + (0.35 + (S.major === 'sci' ? 0.3 : 0) + Math.max(0, (S.st.science - 40) / 22)) * (S.corps.includes('space') ? 1.3 : 1), 0, 100);
   S.st.card = null; S.hour = 8; newDay();
   say(c.who + ' ' + ch[0] + '.');
   const dead = Object.keys(BARS).find(k => S.st[k] <= 0);
@@ -1422,8 +1714,395 @@ function stateView() {
   ]);
   return h;
 }
-TABS.state = { ic: '👑', n: 'Госдело', from: 10, to: 10, view: stateView };
+TABS.state = { ic: '👑', n: 'Госдело', from: 10, to: 10, path: 'pol', view: stateView };
 GOALS[10] = () => ({ items: [{ t: 'Космическая программа', cur: Math.floor(S.st.space), need: 100 }] });
+
+function switchToSpace() {
+  const trust = S.pol && S.pol.lvl >= 2 ? 65 : 55;
+  S.path = 'space'; initSpace(trust); M.fn = null; say('🛰️ Политика позади. Ты основал космическую компанию.', 'good'); setStage(9);
+}
+function presidencyModal() {
+  return '<h2>🗳️ Ты победил на президентских выборах!</h2><p>Принять пост главы государства или отказаться от власти и заняться космосом?</p>' +
+    B('👑', 'Принять пост', 'решения-карточки, космическая программа государства', () => enterState(), true, '', 'big') +
+    B('🛰️', 'Отказаться и уйти в космос', 'частная космокомпания, доверие 70', declinePresidency, true, '', 'big');
+}
+function declinePresidency() { S.path = 'space'; initSpace(70); M.fn = null; say('🛰️ Ты отказался от поста и основал космокомпанию.', 'good'); setStage(9); }
+
+/* --- 08_shadow.js --- */
+/* ============ ТЕНЬ: преступный мир (параллельная система) ============ */
+const SH_BASE = [300, 900, 2500, 12000, 80000, 500000, 4e6, 4e7, 3e8, 2e9];
+const shBase = () => SH_BASE[Math.min(S.stage, 10) - 1];
+const OPS = [
+  { t: 1, n: 'Мелкое поручение', ic: '🕶️', h: 2, win: [21, 5], pay: [0.8, 1.8], heat: 3, risk: 0.10, auth: 1, minAuth: 0, en: 8, crew: 0 },
+  { t: 2, n: 'Серая сделка', ic: '💼', h: 3, win: [22, 5], pay: [6, 12], heat: 6, risk: 0.20, auth: 2, minAuth: 10, en: 12, crew: 1 },
+  { t: 3, n: 'Крупная операция', ic: '🧳', h: 4, win: [0, 5], pay: [25, 50], heat: 12, risk: 0.32, auth: 4, minAuth: 30, en: 16, crew: 2 },
+  { t: 4, n: 'Теневой контракт', ic: '🗝️', h: 6, win: [1, 5], pay: [90, 180], heat: 20, risk: 0.45, auth: 8, minAuth: 60, en: 22, crew: 3 }
+];
+const ROLES = {
+  driver: { n: 'Водитель', ic: '🚗', d: '+3% к успеху дел за уровень' },
+  force: { n: 'Силовик', ic: '🥊', d: 'меньше насилия, нужен для крупных дел' },
+  acc: { n: 'Бухгалтер', ic: '🧮', d: 'отмывание дешевле' },
+  law: { n: 'Юрист', ic: '⚖️', d: 'сроки и штрафы меньше, снятие судимости дешевле' },
+  inf: { n: 'Информатор', ic: '📡', d: 'внимание остывает быстрее, меньше потерь от задержаний' }
+};
+const SH_NAMES = ['Сеня', 'Гоша', 'Борода', 'Тихий', 'Лёва', 'Макс', 'Ворон', 'Лис', 'Дима', 'Штиль', 'Кирпич', 'Север', 'Фил', 'Грач'];
+const crewN = r => S.sh.crew.filter(m => m.role === r).reduce((a, m) => a + m.skill, 0);
+const crewHas = r => S.sh.crew.some(m => m.role === r);
+const crewCap = () => Math.min(8, 2 + Math.floor(S.sh.auth / 20));
+const wage = m => Math.round(shBase() * 0.04 * m.skill * m.greed);
+const heatIcon = () => S.sh.heat < 30 ? '🟢' : S.sh.heat < 60 ? '🟡' : S.sh.heat < 80 ? '🟠' : '🔴';
+const shVis = () => !!S.sh && (S.sh.on || S.sh.offer) && (S.stage < 10 || S.path === 'space');
+
+/* ---------- насилие и смерть ---------- */
+function violence(dmg, why) {
+  S.hp -= dmg;
+  if (S.hp <= 0) { die(why || 'убит в разборках'); return; }
+  say('🩸 Тебя избили: здоровье -' + Math.round(dmg) + '.', 'bad'); note('error');
+}
+
+/* ---------- ежедневный ход тени ---------- */
+DAILY.push(() => {
+  const sh = S.sh;
+  if (!sh) return;
+  if (sh.prison) { prisonDaily(); return; }
+  if (!sh.on) {
+    if (!sh.offer && S.day >= 4 && S.day >= sh.offerCd && Math.random() < 0.06) { sh.offer = true; say('🌑 К тебе подошёл человек с предложением. Подумай хорошенько.', 'bad'); }
+    return;
+  }
+  // зарплаты и верность
+  for (const m of sh.crew) { const w = wage(m); if (sh.dirty >= w) { sh.dirty -= w; m.loy = Math.min(100, m.loy + 0.3); } else { m.loy -= 4; } }
+  // остывание
+  const idle = sh.opDay < S.day - 1;
+  sh.heat = clamp(sh.heat - (idle ? 3 : 1.5) - (crewHas('inf') ? 0.7 : 0));
+  if (sh.dirty > Math.max(shBase() * 25, 3 * rub())) sh.heat = clamp(sh.heat + 1.5);
+  // люди
+  for (const m of [...sh.crew]) {
+    if (sh.heat >= 60 && Math.random() < 0.03) { sh.crew = sh.crew.filter(x => x !== m); sh.heat = clamp(sh.heat + (m.loy < 50 ? 10 : 3)); say('🚔 Арестован человек из команды: ' + m.name + '.', 'bad'); continue; }
+    if (Math.random() < 0.002 + sh.heat * 0.0002 + (m.loy < 30 ? 0.04 : 0)) { sh.crew = sh.crew.filter(x => x !== m); sh.heat = clamp(sh.heat + 20); say('🐀 ' + m.name + ' пошёл на сделку со следствием. Внимание властей растёт.', 'bad'); note('error'); }
+  }
+  // обыск
+  if (sh.heat >= 60 && Math.random() < 0.12) { const l = Math.round(sh.dirty * 0.2); sh.dirty -= l; sh.heat = clamp(sh.heat - 8); say('🚨 Обыск. Изъято грязных денег: ' + mny(l) + '.', 'bad'); note('error'); }
+  // дело и суд
+  if (sh.heat >= 80 && !sh.case) { sh.case = { dl: S.day + 4 }; say('🚨 На тебя завели уголовное дело! Есть 4 дня.', 'bad'); note('error'); }
+  if (sh.case && S.day > sh.case.dl) { arrest('Суд вынес приговор'); return; }
+  // давление конкурентов
+  if (!sh.press && sh.auth >= 15 && Math.random() < 0.05) { sh.press = { dl: S.day + 3 }; say('👤 Конкуренты потребовали долю. Срок: 3 дня.', 'bad'); }
+  if (sh.press && S.day > sh.press.dl) { sh.press = null; const l = Math.round(sh.dirty * 0.3); sh.dirty -= l; say('👤 Конкуренты не стали ждать: -' + mny(l) + ' грязных.', 'bad'); violence(rand(20, 40) * (crewN('force') ? 0.7 : 1)); }
+});
+
+/* ---------- дела ---------- */
+function opReq(o) {
+  const sh = S.sh;
+  if (sh.auth < o.minAuth) return 'Нужно связей ' + o.minAuth;
+  if (sh.crew.length < o.crew) return 'Нужно людей: ' + o.crew;
+  if (o.t >= 3 && !crewHas('force')) return 'Нужен силовик';
+  if (o.t >= 4 && !crewHas('law')) return 'Нужен юрист';
+  return '';
+}
+function doOp(o) {
+  const sh = S.sh;
+  if (!tick(o.h, 'out')) return;
+  logWork(o.h); enUp(-o.en); moodUp(-5); sh.opDay = S.day; sh.ops++; S.did['op' + o.t] = 1;
+  const pf = clamp(o.risk + sh.heat * 0.003 + (sh.heat >= 30 ? 0.05 : 0) - crewN('driver') * 0.03 - sh.auth * 0.001, 0.03, 0.85);
+  if (Math.random() >= pf) {
+    const pay = Math.round(shBase() * rf(o.pay[0], o.pay[1]));
+    sh.dirty += pay; sh.auth += o.auth; S.stats.shadow = (S.stats.shadow || 0) + pay;
+    sh.heat = clamp(sh.heat + o.heat * (crewHas('inf') ? 0.85 : 1));
+    say('🌑 ' + o.n + ': +' + mny(pay) + ' грязных.', 'good');
+    return;
+  }
+  const r = Math.random();
+  if (r < 0.55) { sh.heat = clamp(sh.heat + 8); say('🌑 ' + o.n + ' сорвалось. Внимание растёт.', 'bad'); }
+  else if (r < 0.85) {
+    if (sh.heat >= 70) { arrest('Задержан на деле'); return; }
+    const fine = Math.round(shBase() * 2 * (crewHas('law') ? 0.6 : 1) * (crewHas('inf') ? 0.8 : 1)), fromD = Math.min(sh.dirty, fine); sh.dirty -= fromD; quietPay(fine - fromD);
+    sh.heat = clamp(sh.heat + 15); sh.crew.forEach(m => m.loy -= 5);
+    say('🚔 Задержание. Откупился и заплатил ' + mny(fine) + '. Внимание +15.', 'bad'); note('error');
+  } else {
+    if (o.t >= 3 && Math.random() < 0.08) { die('убит на деле'); return; }
+    violence(rand(20, 45) * (crewN('force') ? Math.max(0.4, 1 - 0.2 * crewN('force')) : 1));
+  }
+}
+
+/* ---------- отмывание ---------- */
+const CHANNELS = [
+  { id: 'ac', n: 'Через знакомых', ic: '🤝', loss: 0.35, cap: 8, heat: 2, min: 1, ok: () => whenOk(10, 22), why: () => 'Только 10-22' },
+  { id: 'cas', n: 'Через казино', ic: '🎰', loss: 0.20, cap: 30, heat: 4, min: 2, ok: () => casOpen(), why: () => 'Открыто ' + casTxt() },
+  { id: 'fx', n: 'Через обменник', ic: '💱', loss: 0.18, cap: 50, heat: 3, min: 4, ok: () => whenOk(9, 18, 'wd'), why: () => 'Только ' + whenTxt(9, 18, 'wd') },
+  { id: 'biz', n: 'Через бизнес', ic: '🏭', loss: 0.12, cap: 120, heat: 3, min: 6, ok: () => S.biz.units.length > 0 && whenOk(9, 18, 'wd'), why: () => S.biz.units.length ? 'Только ' + whenTxt(9, 18, 'wd') : 'Нужен бизнес' }
+];
+function launderLeft(c) { const sh = S.sh; if (sh.lday !== S.day) { sh.lday = S.day; sh.lused = {}; } return Math.max(0, shBase() * c.cap - (sh.lused[c.id] || 0)); }
+function launder(c) {
+  const sh = S.sh, x = Math.min(sh.dirty, launderLeft(c));
+  if (x <= 0) return toast('Сегодня больше не получится');
+  if (!tick(1, 'out')) return;
+  const loss = c.loss - Math.min(0.09, 0.03 * crewN('acc'));
+  sh.dirty -= x; sh.lused[c.id] = (sh.lused[c.id] || 0) + x; S.cash.RUB += x * (1 - loss);
+  sh.heat = clamp(sh.heat + c.heat);
+  say('🧼 ' + c.n + ': ' + mny(x) + ' стало ' + mny(x * (1 - loss)) + ' чистых.', 'good');
+}
+
+/* ---------- команда ---------- */
+function recruit(role) {
+  const sh = S.sh, cost = shBase() * 4;
+  if (sh.dirty < cost) return toast('Не хватает грязных денег');
+  sh.dirty -= cost;
+  const name = SH_NAMES[rand(0, SH_NAMES.length - 1)];
+  sh.crew.push({ name, role, skill: rand(1, 3), loy: rand(55, 75), greed: +rf(0.8, 1.4).toFixed(2) });
+  say('👥 В команде новый человек: ' + name + ' (' + ROLES[role].n + ').', 'good');
+}
+
+/* ---------- дело, арест, тюрьма ---------- */
+function arrest(why) {
+  const sh = S.sh, c = sh.case || {};
+  const f = (c.lawyer ? 0.6 : 1) * (crewHas('law') ? 0.8 : 1) * (c.bribeFail ? 1.3 : 1) * (c.deal ? 0.7 : 1);
+  const days = clamp(Math.round((10 + S.stage * 6 + sh.ops * 0.4 + sh.heat * 0.2) * f), 7, 120);
+  const lostD = sh.dirty, lostC = Math.round(S.cash.RUB * 0.35);
+  sh.dirty = 0; S.cash.RUB -= lostC;
+  for (const k in S.stk) S.stk[k].q = Math.floor(S.stk[k].q * 0.85);
+  S.deposit *= 0.85;
+  sh.prison = { until: S.day + days, start: S.day, good: 0, appeal: false };
+  sh.crime = true; sh.crimeDay = S.day; sh.case = null; sh.press = null; sh.heat = 20; sh.auth = Math.max(0, sh.auth - 15);
+  sh.crew = sh.crew.filter(() => Math.random() < 0.6);
+  S.rep = clamp(S.rep - 20); S.pend = []; S.did = {}; S.tab = 'shadow';
+  say('⛓️ ' + why + '. Срок: ' + days + ' дн. Изъято: ' + mny(lostD) + ' грязных и ' + mny(lostC) + ' чистых.', 'bad'); note('error');
+  M.fn = () => '<h2>⛓️ Арест</h2><p>' + why + '. Срок: <b>' + days + ' дней</b>. Конфисковано: ' + mny(lostD) + ' грязных и ' + mny(lostC) + ' чистых, потеряна часть вложений.</p><p>За решёткой время идёт, а дела и бизнес без тебя хиреют. На свободе тебя будет ждать судимость: она закрывает лицензии, часть профессий и политику.</p><button class="btn" data-close="1">Понял</button>';
+}
+function prisonDaily() {
+  const sh = S.sh;
+  S.food = 70; S.energy = 70; S.mood = clamp(S.mood - 1);
+  if (S.day >= sh.prison.until) release();
+}
+function release() {
+  const sh = S.sh;
+  sh.prison = null; sh.heat = 15; S.hour = 9; S.tab = tabsNow()[0];
+  say('🔓 Ты вышел на свободу. Судимость осталась.', 'bad');
+  M.fn = () => '<h2>🔓 Освобождение</h2><p>Ты отсидел свой срок. Судимость закрывает лицензию брокера, политику и профессии юриста, врача и учителя. Через 120 дней и за плату её можно снять.</p><button class="btn" data-close="1">Вперёд</button>';
+}
+function prisonAdvance() {
+  const sh = S.sh; S.hour = 8; newDay();
+  if (sh.prison && sh.prison.good >= 10) { sh.prison.until -= 3; sh.prison.good = 0; say('🕊️ За хорошее поведение срок сокращён на 3 дня.', 'good'); }
+}
+function prisonView() {
+  const p = S.sh.prison, left = p.until - S.day;
+  return box('<b>⛓️ Тюрьма</b><div class="muted">Срок до дня ' + p.until + ' (осталось ' + left + ' дн.). Хорошее поведение: ' + p.good + '/10.<br>Снаружи ничего не ждёт: бизнес без присмотра, дела стоят.</div>') + grid([
+    B('🧰', 'Работа в колонии', 'день, +' + mny(shBase() * 0.15) + ', поведение +1', () => { earn(shBase() * 0.15); p.good++; prisonAdvance(); }),
+    B('🏋️', 'Тренировка', 'день, здоровье +8', () => { heal(8); prisonAdvance(); }),
+    B('🗣️', 'Связи за решёткой', 'день, связи +2, риск драки', () => { S.sh.auth += 2; if (Math.random() < 0.15) { const d = rand(15, 35); S.hp -= d; if (S.hp <= 0) { die('погиб в тюрьме'); return; } say('🩸 Драка во дворе: здоровье -' + d + '.', 'bad'); } prisonAdvance(); }),
+    B('📖', 'Тихий день', 'день, поведение +1', () => { p.good++; prisonAdvance(); }),
+    B('⚖️', 'Апелляция', mny(shBase() * 15) + ', шанс 45%, раз за срок', () => { if (!pay2(shBase() * 15)) return; p.appeal = true; if (Math.random() < 0.45) { const cut = Math.ceil((p.until - S.day) * 0.25); p.until -= cut; say('⚖️ Апелляция удалась: срок меньше на ' + cut + ' дн.', 'good'); } else say('⚖️ Апелляцию отклонили.', 'bad'); }, !p.appeal && rub() >= shBase() * 15, p.appeal ? 'Уже подавал' : 'Нужно ' + mny(shBase() * 15))
+  ]);
+}
+
+/* ---------- панели решений ---------- */
+function shadowAlert() {
+  const sh = S.sh;
+  if (!sh || !shVis() || sh.prison) return '';
+  let h = '';
+  const wo = whenOk(9, 20, 'sixd');
+  if (sh.case) {
+    const c = sh.case, left = c.dl - S.day, lawC = Math.round(shBase() * 12 * (crewHas('law') ? 0.5 : 1)), bribe = shBase() * 20;
+    h += sec('🚨 Уголовное дело') + box('<b>На тебя завели дело</b><div class="muted">Решить до дня ' + c.dl + ' (' + (left > 0 ? 'осталось ' + left + ' дн.' : 'последний день') + '). Иначе арест и срок.</div>');
+    h += grid([
+      B('⚖️', 'Нанять адвоката', mny(lawC) + ', шанс закрыть дело ' + Math.round(100 * (0.3 + 0.1 * crewN('law'))) + '%', () => { if (!pay2(lawC)) return; if (Math.random() < 0.3 + 0.1 * crewN('law')) { sh.case = null; sh.heat = 50; say('⚖️ Адвокат закрыл дело.', 'good'); note('success'); } else { c.lawyer = true; sh.heat = clamp(sh.heat - 10); say('⚖️ Дело не закрыли, но срок будет мягче.'); } }, !c.lawyer && rub() >= lawC && wo, c.lawyer ? 'Адвокат уже работает' : !wo ? 'Только ' + whenTxt(9, 20, 'sixd') : 'Нужно ' + mny(lawC)),
+      B('💰', 'Откупиться', mny(bribe) + ' грязных, шанс 55%', () => { if (sh.dirty < bribe) return toast('Не хватает грязных денег'); sh.dirty -= bribe; if (Math.random() < 0.55) { sh.case = null; sh.heat = 45; say('💰 Дело закрыто за деньги.', 'good'); } else { c.bribeFail = true; sh.heat = clamp(sh.heat + 10); say('💰 Взятку не приняли, это ухудшило положение.', 'bad'); } }, sh.dirty >= bribe && !c.bribeFail, c.bribeFail ? 'Уже пробовал' : 'Нужно ' + mny(bribe) + ' грязных'),
+      B('🐀', 'Сдать человека', 'закрывает дело, теряешь связи', () => { const m = [...sh.crew].sort((a, b) => a.skill - b.skill)[0]; sh.crew = sh.crew.filter(x => x !== m); sh.case = null; sh.heat = 40; sh.auth = Math.max(0, sh.auth - 10); S.rep = clamp(S.rep - 5); say('🐀 Ты сдал ' + m.name + ' и закрыл дело. Люди это запомнят.', 'bad'); }, sh.crew.length > 0, 'Некого'),
+      B('🏃', 'Бежать', 'потеряешь 60% денег, этап вниз', () => { S.cash.RUB = Math.round(S.cash.RUB * 0.4); sh.dirty = Math.round(sh.dirty * 0.5); sh.case = null; sh.heat = 50; sh.auth = Math.max(0, sh.auth - 20); S.rep = clamp(S.rep - 30); fall(Math.max(1, S.stage - 1), 'Ты бежал, бросив почти всё. Дело закрыто, но жизнь придётся начинать заново.'); })
+    ]);
+  }
+  if (sh.press) {
+    const cost = shBase() * 6, forceN = crewN('force');
+    h += sec('👤 Давление конкурентов') + box('<b>Требуют долю</b><div class="muted">Решить до дня ' + sh.press.dl + '. Иначе силой заберут деньги и изобьют.</div>');
+    h += grid([
+      B('💵', 'Заплатить долю', mny(cost) + ' грязных', () => { sh.dirty -= cost; sh.press = null; say('👤 Откупился от конкурентов.'); }, sh.dirty >= cost, 'Нужно ' + mny(cost)),
+      B('🥊', 'Дать отпор', 'шанс ' + Math.round(100 * clamp(0.45 + 0.15 * forceN, 0, 0.9)) + '%', () => { sh.press = null; if (Math.random() < clamp(0.45 + 0.15 * forceN, 0, 0.9)) { sh.auth += 4; sh.heat = clamp(sh.heat + 6); say('🥊 Отпор удался. Тебя стали уважать.', 'good'); } else { const l = Math.round(sh.dirty * 0.2); sh.dirty -= l; say('🥊 Отпор не вышел: -' + mny(l) + ' грязных.', 'bad'); violence(rand(25, 50) * (forceN ? 0.7 : 1)); } })
+    ]);
+  }
+  return h;
+}
+
+/* ---------- вкладка «Тень» ---------- */
+function shadowView() {
+  const sh = S.sh;
+  if (sh.prison) return prisonView();
+  if (!sh.on) {
+    return box('<b>🌑 Предложение</b><div class="muted">Незнакомец говорит коротко: «Есть работа. Платят сразу и без вопросов. Людям вроде тебя нужны деньги, а мне нужны люди, которые молчат».<br>Дальше будет больше денег и связей, но и внимание властей, обыски, суд, тюрьма. Назад дорога не всегда открыта.</div>') + grid([
+      B('🤝', 'Согласиться', 'откроются ночные дела', () => { sh.on = true; sh.offer = false; sh.opDay = S.day - 5; say('🌑 Ты согласился. Теперь у тебя есть вторая жизнь.', 'bad'); }),
+      B('🚪', 'Отказаться', 'предложение вернётся не скоро', () => { sh.offer = false; sh.offerCd = S.day + 25; if (S.tab === 'shadow') S.tab = tabsNow()[0]; say('Ты отказался и ушёл.'); })
+    ]);
+  }
+  let h = box('<b>🌑 Тень</b><div class="muted">Грязные деньги: <b>' + mny(sh.dirty) + '</b> · внимание властей: <b>' + heatIcon() + ' ' + Math.round(sh.heat) + '/100</b> · связи: <b>' + sh.auth + '</b><br>Дел сделано: ' + sh.ops + (sh.crime ? ' · <b class="dn">судимость</b>' : '') + '<br>Грязные деньги нельзя тратить: их нужно отмыть. Слишком большая заначка поднимает внимание сама.</div>');
+  h += sec('Дела (старт ночью)');
+  h += grid(OPS.map(o => {
+    const rq = opReq(o), wok = whenOk(o.win[0], o.win[1]), did = !!S.did['op' + o.t];
+    const low = Math.round(shBase() * o.pay[0]), hi = Math.round(shBase() * o.pay[1]);
+    const ok = !rq && wok && !did && canWork(o.h) && S.energy >= 25 && S.hp > 25;
+    return B(o.ic, o.n, o.h + ' ч · ' + fmt(low) + '-' + fmt(hi) + ' · ' + whenTxt(o.win[0], o.win[1]), () => doOp(o), ok, rq || (did ? 'Сегодня уже' : !wok ? 'Только ' + whenTxt(o.win[0], o.win[1]) : S.energy < 25 ? 'Нет сил' : S.hp <= 25 ? 'Слишком плохо себя чувствуешь' : 'Лимит часов'));
+  }));
+  h += sec('Отмывание');
+  h += grid(CHANNELS.filter(c => S.stage >= c.min).map(c => {
+    const left = launderLeft(c), loss = Math.round(100 * (c.loss - Math.min(0.09, 0.03 * crewN('acc'))));
+    return B(c.ic, c.n, 'потеря ' + loss + '%, до ' + mny(left) + ' в день', () => launder(c), sh.dirty > 0 && left > 0 && c.ok(), sh.dirty <= 0 ? 'Нет грязных денег' : left <= 0 ? 'Лимит на сегодня' : c.why());
+  }));
+  h += sec('Внимание и защита');
+  const bribeC = shBase() * 6;
+  h += grid([
+    B('💰', 'Подкупить чиновника', mny(bribeC) + ' грязных, внимание -15', () => { sh.dirty -= bribeC; sh.heat = clamp(sh.heat - 15); S.did.bribe = 1; say('💰 Нужный человек закрыл глаза.'); }, !S.did.bribe && sh.dirty >= bribeC && whenOk(10, 20), S.did.bribe ? 'Сегодня уже' : sh.dirty < bribeC ? 'Нужно ' + mny(bribeC) : 'Только 10-20'),
+    B('🛌', 'Залечь на дно', '8 ч, внимание -6', () => { if (!tick(8, 'home')) return; sh.heat = clamp(sh.heat - 6); S.did.low = 1; say('🛌 Сутки тише воды.'); }, !S.did.low, 'Сегодня уже'),
+    B('📜', 'Снять судимость', mny(shBase() * 40 * (crewHas('law') ? 0.5 : 1)) + ', через 120 дней', () => { const c = Math.round(shBase() * 40 * (crewHas('law') ? 0.5 : 1)); if (!pay2(c)) return; sh.crime = false; say('📜 Судимость снята.', 'good'); note('success'); }, sh.crime && S.day - sh.crimeDay >= 120 && rub() >= shBase() * 40 * (crewHas('law') ? 0.5 : 1) && whenOk(9, 18, 'wd'), !sh.crime ? 'Судимости нет' : S.day - sh.crimeDay < 120 ? 'Со дня ' + (sh.crimeDay + 120) : 'Нужны деньги и будни 9-18')
+  ]);
+  h += sec('Команда (' + sh.crew.length + '/' + crewCap() + ', платишь грязными)');
+  h += sh.crew.map(m => '<div class="row2"><div class="nm">' + ROLES[m.role].ic + ' <b>' + m.name + '</b> · ' + ROLES[m.role].n + ' ур. ' + m.skill + '<small>верность ' + Math.round(m.loy) + ' · жалование ' + mny(wage(m)) + '/день</small></div><div class="btns">' +
+    mini('Премия', () => { const c = wage(m) * 10; sh.dirty -= c; m.loy = Math.min(100, m.loy + 20); say('Премия людям: верность растёт.'); }, sh.dirty >= wage(m) * 10) +
+    mini('Уволить', () => { sh.crew = sh.crew.filter(x => x !== m); say('Расстался с ' + m.name + '.'); sh.heat = clamp(sh.heat + (m.loy < 50 ? 6 : 0)); }) + '</div></div>').join('') || '<div class="muted">Пока работаешь один.</div>';
+  const rc = shBase() * 4, full = sh.crew.length >= crewCap();
+  h += '<div class="chips">' + Object.keys(ROLES).map(r => mini(ROLES[r].ic + ' ' + ROLES[r].n + ' ' + fmt(rc), () => recruit(r), !full && sh.dirty >= rc)).join('') + '</div><div class="muted">' + (full ? 'Команда полная: больше связей, больше людей.' : 'Нанять человека: ' + mny(rc) + ' грязных. Роли: водитель, силовик, бухгалтер, юрист, информатор.') + '</div>';
+  return h;
+}
+TABS.shadow = { ic: '🌑', n: 'Тень', from: 1, to: 10, vis: shVis, view: shadowView };
+
+/* --- 08_space.js --- */
+/* ============ КОСМИЧЕСКАЯ ВЕТКА: путь магната ракет ============ */
+const SP_STAGES = {
+  9: { ic: '🛰️', n: 'Основатель космокомпании', tag: 'Своя ракетная компания: инженеры, стенды, первые пуски.', feat: ['Наём инженеров и НИОКР по пяти направлениям', 'Завод и стартовый стол', 'Пуски с риском аварии, доверие инвесторов'] },
+  10: { ic: '🚀', n: 'Космический магнат', tag: 'Пилотируемые полёты, Луна и Марс.', feat: ['Тяжёлые и межпланетные ракеты', 'Высадка на Луну', 'Экспедиция на Марс: финал'] }
+};
+const SP_AREAS = [['eng', 'Двигатели', '🔥'], ['str', 'Конструкции', '🧱'], ['ele', 'Электроника', '🧠'], ['fuel', 'Топливо', '⛽'], ['reuse', 'Многоразовость', '♻️']];
+const SP_NAME = { eng: 'Двигатели', str: 'Конструкции', ele: 'Электроника', fuel: 'Топливо', reuse: 'Многоразовость' };
+const ROCKETS = [
+  { n: 'Искра', ic: '🎆', cost: 30e6, pad: 1, plant: 1, need: { eng: 10 }, base: 0.8, d: 'суборбитальная' },
+  { n: 'Заря', ic: '🛰️', cost: 200e6, pad: 1, plant: 1, need: { eng: 30, fuel: 20, ele: 15 }, base: 0.75, d: 'выводит спутники на орбиту' },
+  { n: 'Гром', ic: '🚀', cost: 800e6, pad: 2, plant: 2, need: { eng: 55, str: 45, ele: 40, fuel: 45 }, base: 0.7, d: 'тяжёлая, с экипажем' },
+  { n: 'Колумб', ic: '🛸', cost: 3e9, pad: 3, plant: 3, need: { eng: 80, str: 75, ele: 70, fuel: 75, reuse: 40 }, base: 0.65, d: 'межпланетная' }
+];
+const MILES = [
+  { n: 'Суборбитальный полёт', m: 0, k: 1 },
+  { n: 'Выход на орбиту', m: 1, k: 1 },
+  { n: 'Спутниковая группировка', m: 1, k: 4 },
+  { n: 'Пилотируемый полёт', m: 2, k: 1 },
+  { n: 'Высадка на Луну', m: 2, k: 3 },
+  { n: 'Экспедиция на Марс', m: 3, k: 2 }
+];
+const PLANT_COST = [300e6, 1e9, 4e9], PAD_COST = [200e6, 800e6, 3e9], BUILD_DAYS = [8, 15, 25], ENG_CAP = [10, 30, 80, 200];
+const stg = n => (S.path === 'space' && SP_STAGES[n]) ? SP_STAGES[n] : STAGES[n];
+const inSpace = () => S.path === 'space' && !!S.sp && S.stage >= 9;
+
+function initSpace(trust = 50) {
+  S.sp = { eng: 6, rd: { eng: 0, str: 0, ele: 0, fuel: 0, reuse: 0 }, focus: 'eng', plant: 0, pad: 0, build: null, prod: [], stock: [0, 0, 0, 0], ms: 0, prog: 0, sats: 0, trust, last: S.day, test: 0, pdown: 0, launches: 0, fails: 0, raise: 0 };
+}
+function quietPay(n) { n = Math.round(n); const p = Math.min(rub(), n); S.cash.RUB -= p; if (n > p) S.debt += n - p; }
+function spValue() { const sp = S.sp; let v = 100e6 + sp.eng * 10e6 + sp.sats * 20e6 + SP_AREAS.reduce((a, r) => a + sp.rd[r[0]], 0) * 5e6; for (let i = 0; i < sp.plant; i++) v += PLANT_COST[i]; for (let i = 0; i < sp.pad; i++) v += PAD_COST[i]; return v; }
+const rocketCost = m => Math.round(ROCKETS[m].cost * (1 - 0.006 * S.sp.rd.reuse));
+const rocketOk = m => Object.keys(ROCKETS[m].need).every(k => S.sp.rd[k] >= ROCKETS[m].need[k]);
+const rocketNeedTxt = m => Object.keys(ROCKETS[m].need).map(k => SP_NAME[k] + ' ' + Math.floor(S.sp.rd[k]) + '/' + ROCKETS[m].need[k]).join(', ');
+function launchChance(m) {
+  const sp = S.sp, R = ROCKETS[m], ks = Object.keys(R.need), avg = ks.reduce((a, k) => a + sp.rd[k], 0) / ks.length;
+  return clamp(R.base + avg / 400 + 0.03 * Math.max(0, sp.pad - R.pad) + (sp.test >= S.day ? 0.05 : 0), 0.3, 0.97);
+}
+
+DAILY.push(() => {
+  if (!inSpace()) return;
+  const sp = S.sp;
+  quietPay(sp.eng * 50000);
+  const gain = sp.eng * 0.06 * (sp.plant >= 1 ? 1 : 0.6) * (S.major === 'sci' ? 1.2 : 1);
+  sp.rd[sp.focus] = Math.min(100, sp.rd[sp.focus] + gain);
+  if (sp.build && S.day >= sp.build.done) { sp[sp.build.k] = sp.build.to; say('🏗️ Построено: ' + (sp.build.k === 'plant' ? 'завод' : 'стартовый стол') + ' ур. ' + sp.build.to + '.', 'good'); note('success'); sp.build = null; }
+  for (const it of [...sp.prod]) if (S.day >= it.done) { sp.stock[it.m]++; sp.prod = sp.prod.filter(x => x !== it); say('🚀 Ракета готова: ' + ROCKETS[it.m].n + '.', 'good'); }
+  if (sp.sats > 0) earn(sp.sats * 400000);
+  if (S.day - sp.last > 25) sp.trust = clamp(sp.trust - 0.7);
+  if (sp.trust <= 0) { S.cash.RUB = Math.round(S.cash.RUB * 0.5); S.sp = null; S.path = 'pol'; S.pend = S.pend.filter(e => !e.k.startsWith('sp_')); fall(8, 'Инвесторы отозвали финансирование и забрали половину наличных. Космическая компания закрыта.'); }
+});
+
+function launch(m) {
+  const sp = S.sp, R = ROCKETS[m];
+  if (!tick(6, 'out')) return; logWork(6);
+  sp.stock[m]--; sp.launches++; sp.last = S.day;
+  if (Math.random() < launchChance(m)) {
+    earn(R.cost * 0.35); sp.trust = clamp(sp.trust + 6);
+    if (m === 1) sp.sats += 3; if (m >= 2) sp.sats += 6;
+    say('🚀 Успешный пуск: ' + R.n + '! Заказчик заплатил ' + mny(R.cost * 0.35) + '.', 'good'); note('success');
+    const M = MILES[sp.ms];
+    if (M && M.m === m) {
+      sp.prog++;
+      if (sp.prog >= M.k) {
+        sp.prog = 0; sp.ms++; sp.trust = clamp(sp.trust + 10);
+        say('🏆 Веха: ' + M.n + '!', 'good');
+        if (sp.ms >= MILES.length) { S.over = { type: 'win', space: true }; finishRun(); }
+      }
+    }
+  } else {
+    sp.fails++; sp.pdown = S.day + 7; sp.trust = clamp(sp.trust - (m >= 2 ? 30 : 15));
+    if (m >= 2) S.rep = clamp(S.rep - 20);
+    say('💥 Авария при пуске ' + R.n + '! Стол восстанавливается 7 дней, доверие инвесторов упало.', 'bad'); note('error');
+  }
+}
+
+function spaceView() {
+  const sp = S.sp, wo = whenOk(9, 18, 'wd'), why = 'Только ' + whenTxt(9, 18, 'wd');
+  const M = MILES[Math.min(sp.ms, MILES.length - 1)];
+  let h = box('<b>🛰️ Космокомпания</b><div class="muted">Инженеров: ' + sp.eng + '/' + ENG_CAP[sp.plant] + ' (50 тыс/день каждый) · завод ' + sp.plant + ' · стартовый стол ' + sp.pad + '<br>Доверие инвесторов: <b>' + Math.round(sp.trust) + '</b> · спутников: ' + sp.sats + ' (' + mny(sp.sats * 400000) + '/день) · пусков ' + sp.launches + ', аварий ' + sp.fails +
+    '<br>Следующая веха: <b>' + M.n + '</b> (' + ROCKETS[M.m].n + ' ' + sp.prog + '/' + M.k + ')' + (sp.pdown > S.day ? '<br>⛔ Стол на ремонте до дня ' + sp.pdown : '') + (sp.build ? '<br>🏗️ Строится: ' + (sp.build.k === 'plant' ? 'завод' : 'стол') + ' до дня ' + sp.build.done : '') + '</div>');
+  h += sec('НИОКР (приоритет: ' + SP_NAME[sp.focus] + ')');
+  h += SP_AREAS.map(a => '<div class="row2"><div class="nm">' + a[2] + ' ' + a[1] + '<small>' + Math.floor(sp.rd[a[0]]) + ' / 100</small></div>' + mini(sp.focus === a[0] ? 'Приоритет' : 'Сделать приоритетом', () => { sp.focus = a[0]; }, true, sp.focus === a[0] ? 'on' : '') + '</div>').join('');
+  h += grid([B('⚗️', 'Ускорить НИОКР', mny(25e6) + ', +5 в приоритете, ' + whenTxt(9, 18, 'wd'), () => { if (!pay2(25e6)) return; sp.rd[sp.focus] = Math.min(100, sp.rd[sp.focus] + 5); S.did.rd = 1; say('⚗️ Рывок в направлении «' + SP_NAME[sp.focus] + '».', 'good'); }, !S.did.rd && rub() >= 25e6 && wo, S.did.rd ? 'Сегодня уже' : !wo ? why : 'Нужно 25 млн')]);
+  h += sec('Команда и стройка');
+  const eCost = 15e6, canEng = sp.eng + 5 <= ENG_CAP[sp.plant];
+  const nxtP = sp.plant < 3 ? PLANT_COST[sp.plant] : 0, nxtD = sp.pad < 3 ? PAD_COST[sp.pad] : 0;
+  h += grid([
+    B('🧑‍🔬', 'Нанять 5 инженеров', mny(eCost) + ', ' + whenTxt(9, 18, 'wd'), () => { if (!pay2(eCost)) return; sp.eng += 5; say('🧑‍🔬 В команде +5 инженеров.', 'good'); }, canEng && rub() >= eCost && wo, !canEng ? 'Потолок завода' : !wo ? why : 'Нужно ' + mny(eCost)),
+    B('🏭', sp.plant < 3 ? 'Завод ур. ' + (sp.plant + 1) : 'Завод максимум', sp.plant < 3 ? mny(nxtP) + ', ' + BUILD_DAYS[sp.plant] + ' дн.' : '', () => { if (!pay2(nxtP)) return; sp.build = { k: 'plant', to: sp.plant + 1, done: S.day + BUILD_DAYS[sp.plant] }; say('🏗️ Начато строительство завода.', 'good'); }, sp.plant < 3 && !sp.build && rub() >= nxtP && wo, sp.plant >= 3 ? 'Максимум' : sp.build ? 'Уже строится' : !wo ? why : 'Нужно ' + mny(nxtP)),
+    B('🗼', sp.pad < 3 ? 'Стартовый стол ур. ' + (sp.pad + 1) : 'Стол максимум', sp.pad < 3 ? mny(nxtD) + ', ' + BUILD_DAYS[sp.pad] + ' дн.' : '', () => { if (!pay2(nxtD)) return; sp.build = { k: 'pad', to: sp.pad + 1, done: S.day + BUILD_DAYS[sp.pad] }; say('🏗️ Начато строительство стартового стола.', 'good'); }, sp.pad < 3 && !sp.build && rub() >= nxtD && wo, sp.pad >= 3 ? 'Максимум' : sp.build ? 'Уже строится' : !wo ? why : 'Нужно ' + mny(nxtD)),
+    B('🔥', 'Огневые испытания', '3 ч, ' + mny(15e6) + ', +5% к пуску, ' + whenTxt(20, 24), () => {
+      if (!pay2(15e6)) return; if (!tick(3, 'out')) return; sp.test = S.day + 2; S.did.fire = 1; logWork(3);
+      if (Math.random() < 0.08) { quietPay(40e6); sp.trust = clamp(sp.trust - 5); say('🔥 Авария на стенде: ремонт 40 млн, доверие -5.', 'bad'); } else say('🔥 Огневые испытания прошли штатно.', 'good');
+    }, !S.did.fire && whenOk(20, 24) && rub() >= 15e6 && canWork(3), S.did.fire ? 'Сегодня уже' : 'Только ' + whenTxt(20, 24)),
+    B('💼', 'Привлечь инвестиции', '~' + mny(Math.round(spValue() * 0.15 * sp.trust / 50)) + ', раз в 20 дней, ' + whenTxt(10, 17, 'wd'), () => { const x = Math.round(spValue() * 0.15 * sp.trust / 50); earn(x); sp.raise = S.day + 20; sp.trust = clamp(sp.trust - 3); say('💼 Инвесторы вложили ' + mny(x) + '.', 'good'); }, S.day >= sp.raise && whenOk(10, 17, 'wd') && sp.trust >= 20, S.day < sp.raise ? 'Следующий раунд с дня ' + sp.raise : sp.trust < 20 ? 'Нет доверия' : 'Только ' + whenTxt(10, 17, 'wd'))
+  ]);
+  h += sec('Ракеты');
+  ROCKETS.forEach((R, m) => {
+    const unl = rocketOk(m), c = rocketCost(m), busy = sp.prod.length >= Math.max(1, sp.plant);
+    const canBuild = unl && sp.plant >= R.plant && !busy && rub() >= c && wo;
+    const canLaunch = sp.stock[m] > 0 && sp.pad >= R.pad && sp.pdown <= S.day && whenOk(5, 12) && canWork(6);
+    h += '<div class="row2"><div class="nm"><b>' + R.ic + ' ' + R.n + '</b> · ' + R.d + '<small>в наличии: ' + sp.stock[m] + ' · цена ' + mny(c) + ' · шанс пуска ' + Math.round(launchChance(m) * 100) + '%' + (unl ? '' : '<br>Нужно: ' + rocketNeedTxt(m)) + (sp.plant < R.plant ? '<br>Нужен завод ур. ' + R.plant : '') + (sp.pad < R.pad ? '<br>Нужен стол ур. ' + R.pad : '') + '</small></div><div class="btns">' +
+      mini('Построить', () => { if (!pay2(c)) return; sp.prod.push({ m, done: S.day + 3 + m * 2 }); say('🏭 В производстве: ' + R.n + ' (до дня ' + (S.day + 3 + m * 2) + ').', 'good'); }, canBuild) +
+      mini('Запуск 5-12', () => launch(m), canLaunch) + '</div></div>';
+  });
+  if (sp.prod.length) h += box('В цехе: ' + sp.prod.map(x => ROCKETS[x.m].n + ' (день ' + x.done + ')').join(', '));
+  return h + grid([B('⏭', 'Ждать день', '', () => waitDays(1))]);
+}
+TABS.space = { ic: '🛰️', n: 'Космос', from: 9, to: 10, path: 'space', view: spaceView };
+
+/* ---------- цели космического пути ---------- */
+const _g9 = GOALS[9];
+GOALS[9] = () => {
+  if (!inSpace()) return _g9();
+  const sp = S.sp;
+  return {
+    items: [{ t: 'Вехи до пилотируемого полёта', cur: Math.min(sp.ms, 3), need: 3 }, { t: 'Доверие инвесторов', cur: Math.round(sp.trust), need: 50 }],
+    btn: '🚀 Стать космическим магнатом', can: sp.ms >= 3 && sp.trust >= 50, go() { setStage(10); }
+  };
+};
+GOALS[10] = ((g10) => () => inSpace() ? { items: [{ t: 'Вехи: ' + (MILES[Math.min(S.sp.ms, 5)].n), cur: S.sp.ms, need: MILES.length }, { t: 'Доверие инвесторов', cur: Math.round(S.sp.trust), need: 30 }] } : g10())(GOALS[10]);
+
+/* ---------- срочные дела космокомпании ---------- */
+EVDEF.sp_accident = { cd: 14, st: [9, 10], w: 3, dl: 2, ic: '💥', t: 'Авария на стенде', cond: () => inSpace() && S.sp.eng >= 8,
+  x: () => 'При испытании двигателя произошёл взрыв. Нужно принять решение.',
+  opts: [
+    { l: 'Остановить работы на проверку', h: 2, when: ofc, run: () => { S.sp.pdown = Math.max(S.sp.pdown, S.day + 3); say('💥 Проверка завершена, потеряно 3 дня.'); } },
+    { l: 'Оплатить срочный ремонт', c: () => 40e6, when: ofc, run: () => say('💥 Ремонт оплачен, график сохранён.', 'good') }],
+  fail: () => { S.sp.trust = clamp(S.sp.trust - 10); S.sp.eng = Math.max(2, S.sp.eng - 3); say('💥 Промедление стоило доверия и трёх инженеров.', 'bad'); } };
+EVDEF.sp_poach = { cd: 18, st: [9, 10], w: 3, dl: 3, ic: '🕴️', t: 'Конкурент переманивает инженеров', cond: () => inSpace() && S.sp.eng >= 10,
+  x: () => 'Ведущие инженеры получили предложения от соседей.',
+  opts: [
+    { l: 'Поднять зарплаты', c: () => S.sp.eng * 200000, when: ofc, run: () => say('🕴️ Команда осталась.', 'good') },
+    { l: 'Отпустить недовольных', run: () => { const l = Math.ceil(S.sp.eng * 0.15); S.sp.eng -= l; say('🕴️ Ушло инженеров: ' + l + '.', 'bad'); } }],
+  fail: () => { const l = Math.ceil(S.sp.eng * 0.25); S.sp.eng -= l; say('🕴️ Конкуренты забрали ' + l + ' инженеров.', 'bad'); } };
+EVDEF.sp_safety = { cd: 25, st: [9, 10], w: 2, dl: 3, ic: '📋', t: 'Проверка безопасности пусковой', cond: () => inSpace() && S.sp.pad >= 1,
+  x: () => 'Надзор требует подтвердить безопасность площадки.',
+  opts: [
+    { l: 'Привлечь юристов', c: () => 30e6, when: ofc, run: () => say('📋 Проверка закрыта без замечаний.', 'good') },
+    { l: 'Принять замечания', h: 3, when: ofc, run: () => { S.sp.pdown = Math.max(S.sp.pdown, S.day + 2); say('📋 Замечания устранены, потеряно 2 дня.'); } }],
+  fail: () => { forcePay(60e6, 'Штраф надзора'); S.sp.trust = clamp(S.sp.trust - 8); } };
 
 /* --- 09_rating.js --- */
 /* ===================== РЕЙТИНГ ===================== */
@@ -1453,7 +2132,7 @@ async function fetchTop() {
 }
 function ratingView() {
   const sc = calcScore();
-  let h = box('<b>🏆 Твой результат</b><div class="muted">Очки: <b style="color:var(--gold)">' + fmt(sc) + '</b> · этап ' + S.stage + ' (' + STAGES[S.stage].n + ') · день ' + S.day + '<br>Капитал: ' + mny(netWorth()) + '<br>Лучший забег: ' + (META.best ? fmt(META.best.score) + ' очков, этап ' + META.best.stage + ', день ' + META.best.day : 'ещё нет') + ' · забегов: ' + META.runs + ' · побед: ' + META.wins + '</div>');
+  let h = box('<b>🏆 Твой результат</b><div class="muted">Очки: <b style="color:var(--gold)">' + fmt(sc) + '</b> · этап ' + S.stage + ' (' + stg(S.stage).n + ') · день ' + S.day + '<br>Капитал: ' + mny(netWorth()) + '<br>Лучший забег: ' + (META.best ? fmt(META.best.score) + ' очков, этап ' + META.best.stage + ', день ' + META.best.day : 'ещё нет') + ' · забегов: ' + META.runs + ' · побед: ' + META.wins + '</div>');
   h += '<div class="muted" style="margin-bottom:6px">Очки = этап × 10 000 + логарифм капитала − дни. Чем быстрее поднимаешься, тем выше.</div>';
   h += grid([
     B('📤', 'Отправить результат', API_URL ? 'в общий рейтинг' : 'рейтинг не подключён', () => { submitScore(true).then(fetchTop); toast('Отправлено'); }, !!API_URL && !!(tg && tg.initData), 'Нужен сервер рейтинга и запуск из Telegram'),
@@ -1489,7 +2168,7 @@ function goTab(id) {
 }
 function statsHTML() {
   let bars;
-  if (S.stage >= 10) bars = Object.keys(BARS).map(k => ({ v: S.st[k], ic: BARS[k][0], n: BARS[k][1], c: { treasure: '#f59e0b', people: '#38bdf8', army: '#ef4444', science: '#a3e635' }[k] }));
+  if (S.stage >= 10 && S.path !== 'space') bars = Object.keys(BARS).map(k => ({ v: S.st[k], ic: BARS[k][0], n: BARS[k][1], c: { treasure: '#f59e0b', people: '#38bdf8', army: '#ef4444', science: '#a3e635' }[k] }));
   else {
     bars = [
       { v: S.hp, ic: '❤️', n: 'Здоровье', c: '#ef4444' },
@@ -1501,6 +2180,7 @@ function statsHTML() {
   return bars.map(b => { const v = Math.round(b.v); return '<div class="stat' + (v < 25 ? ' low' : '') + '"><div class="row"><span>' + b.ic + ' ' + b.n + '</span><b>' + v + '</b></div><div class="bar"><i style="width:' + v + '%;background:' + b.c + '"></i></div></div>'; }).join('');
 }
 function goalHTML() {
+  if (S.sh && S.sh.prison) return '';
   const gf = GOALS[S.stage]; if (!gf) return '';
   const g = gf();
   let h = '<div class="goalbox"><div class="gt">Цель этапа</div>';
@@ -1511,11 +2191,13 @@ function goalHTML() {
     } else h += '<div class="gi ' + (it.done ? 'done' : '') + '"><span>' + (it.done ? '✓' : '○') + ' ' + it.t + '</span><span class="v">' + (it.v || '') + '</span></div>';
   }
   if (g.btn && g.can) h += '<div class="acts" style="margin:8px 0 0">' + B('⭐', g.btn, 'Условия выполнены', () => g.go(), true, '', 'win big') + '</div>';
+  if (g.btn2 && g.can2) h += '<div class="acts" style="margin:8px 0 0">' + B('🛰️', g.btn2, 'Условия выполнены', () => g.go2(), true, '', 'win big') + '</div>';
   return h + '</div>';
 }
 function walletModal() {
   let h = '<h2>💰 Кошелёк</h2><div class="item"><span class="ic">₽</span><div class="tx">Рубли<small>' + mny(S.cash.RUB) + '</small></div></div>';
   for (const c of ['USD', 'EUR', 'CNY']) if (S.cash[c] > 0 || S.stage >= 4) h += '<div class="item"><span class="ic">' + SYM[c] + '</span><div class="tx">' + CUR_NAMES[c] + '<small>' + S.cash[c].toFixed(0) + ' ' + SYM[c] + ' = ' + mny(S.cash[c] * S.fx.r[c]) + '</small></div></div>';
+  if (S.sh && S.sh.dirty > 0) h += '<div class="item"><span class="ic">🌑</span><div class="tx">Грязные деньги<small>' + mny(S.sh.dirty) + ', внимание ' + Math.round(S.sh.heat) + '/100</small></div></div>';
   if (S.deposit > 0) h += '<div class="item"><span class="ic">🏦</span><div class="tx">Вклад<small>' + mny(S.deposit) + '</small></div></div>';
   if (S.debt > 0) h += '<div class="item"><span class="ic">⚠️</span><div class="tx">Долг<small>' + mny(S.debt) + '</small></div></div>';
   h += '<p>Капитал: <b>' + mny(netWorth()) + '</b><br>Очки рейтинга: <b>' + fmt(calcScore()) + '</b></p>';
@@ -1525,20 +2207,20 @@ function walletModal() {
 function render() {
   if (!S) return;
   CUR = [];
-  const st = STAGES[S.stage];
+  const st = stg(S.stage);
   $('#stage').textContent = st.ic + ' ' + st.n;
-  $('#clock').textContent = 'День ' + S.day + ' · ' + pad(Math.floor(S.hour)) + ':' + (S.hour % 1 ? '30' : '00');
+  $('#clock').textContent = WD[wday()] + ' · д.' + S.day + ' · ' + pad(Math.floor(S.hour)) + ':' + (S.hour % 1 ? '30' : '00');
   $('#wallet').textContent = '💰 ' + fmt(rub()) + ' ₽';
   $('#stats').innerHTML = statsHTML();
   $('#goal').innerHTML = goalHTML();
   const lg = $('#log');
   lg.innerHTML = S.log.slice(-6).map(l => '<div class="' + l.cls + '">' + l.t + '</div>').join('') || '<div>Новый день...</div>';
-  lg.scrollTop = lg.scrollHeight;
+  if (!window.__fast) lg.scrollTop = lg.scrollHeight;
   const tabs = tabsNow();
   if (!tabs.includes(S.tab)) S.tab = tabs[0];
-  $('#view').innerHTML = TABS[S.tab].view();
+  $('#view').innerHTML = shadowAlert() + pendHTML() + TABS[S.tab].view();
   $('#nav').innerHTML = tabs.map(id => '<button data-tab="' + id + '" class="' + (id === S.tab ? 'on' : '') + '"><span>' + TABS[id].ic + '</span><small>' + TABS[id].n + '</small></button>').join('');
-  const nb = $('#nav button.on'); if (nb && nb.scrollIntoView) T(() => nb.scrollIntoView({ block: 'nearest', inline: 'center' }));
+  if (!window.__fast) { const nb = $('#nav button.on'); if (nb && nb.scrollIntoView) T(() => nb.scrollIntoView({ block: 'nearest', inline: 'center' })); }
   const md = $('#modal');
   if (M.fn) { $('#modalBody').innerHTML = M.fn(); md.classList.add('show'); } else md.classList.remove('show');
   renderOver();
@@ -1552,15 +2234,16 @@ function renderOver() {
   }
   if (!S.over) { o.classList.remove('show'); return; }
   const w = S.over.type === 'win';
-  o.innerHTML = '<div class="sheet"><h2>' + (w ? '🚀 Ракета ушла в космос!' : '💀 Ты ' + S.over.why) + '</h2><p>' +
-    (w ? 'От ночлежки до космодрома. Страна запомнит тебя.' : EPI[S.day % EPI.length]) +
+  const sp = S.over.space;
+  o.innerHTML = '<div class="sheet"><h2>' + (w ? (sp ? '🛸 Колумб сел на Марс!' : '🚀 Ракета ушла в космос!') : '💀 Ты ' + S.over.why) + '</h2><p>' +
+    (w ? (sp ? 'От ночлежки до первой марсианской экспедиции. Твоя компания вошла в историю.' : 'От ночлежки до космодрома. Страна запомнит тебя.') : EPI[S.day % EPI.length]) +
     '</p><p>Дней: <b>' + S.day + '</b><br>Очки: <b>' + fmt(calcScore()) + '</b><br>Капитал: <b>' + mny(netWorth()) + '</b></p>' +
     '<button class="btn" id="againBtn">Играть заново</button><button class="btn alt" id="shareBtn">Поделиться</button></div>';
   o.classList.add('show');
 }
 function share() {
   const w = S.over && S.over.type === 'win';
-  const txt = w ? 'Я прошёл путь от бездомного до космоса за ' + S.day + ' дн.! Сможешь быстрее?' : 'Я дошёл до этапа «' + STAGES[S.stage].n + '» за ' + S.day + ' дн. Сможешь выше?';
+  const txt = w ? 'Я прошёл путь от бездомного до космоса за ' + S.day + ' дн.! Сможешь быстрее?' : 'Я дошёл до этапа «' + stg(S.stage).n + '» за ' + S.day + ' дн. Сможешь выше?';
   const link = 'https://t.me/share/url?url=' + encodeURIComponent(SHARE_URL || location.href) + '&text=' + encodeURIComponent(txt);
   if (tg && tg.openTelegramLink) { try { tg.openTelegramLink(link); return; } catch (e) {} }
   window.open(link, '_blank');
